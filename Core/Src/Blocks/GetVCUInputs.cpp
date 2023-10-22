@@ -26,12 +26,11 @@
 
 using namespace std;
 
-
 uint16_t adcData[ADC_BUF_SIZE];
 
 FDCAN_TxHeaderTypeDef TxHeader;
 FDCAN_RxHeaderTypeDef RxHeader;
-#define REQUEST_VCU_DATA_ID 0x100
+#define VCU_REQUEST_DATA_ID 0x100
 #define HVC_RESPONSE_ID 0x110
 #define HVC_IMU2_RESPONSE_ID 0x111
 #define INV_RESPONSE_ID 0x120
@@ -42,11 +41,28 @@ FDCAN_RxHeaderTypeDef RxHeader;
 #define WHS3_RESPONSE_ID 0x160
 #define WHS4_RESPONSE_ID 0x170
 
+#define INV_TEMP1_DATA 0x0A0 //Stores inverter module temperature
+#define INV_TEMP3_DATA 0x0A2 //Stores motor temperature
+#define INV_MOTOR_POSITIONS 0x0A5 //Stores motor position
+#define INV_CURRENT 0x0A6 //Stores motor velocity
+#define INV_VOLTAGE 0x0A7 //Stores motor voltage
+#define INV_STATE_CODES 0x0AA //Stores inverter state codes
+#define INV_FAULT_CODES 0x0AB //Stores inverter fault codes
+#define INV_TORQUE_TIMER 0x0AC //Stores inverter torque results
+#define INV_HIGH_SPEED_MSG 0x0B0 //Stores inverter high speed message
+#define VCU_INV_COMMAND 0x0C0 //Stores inverter command
+#define VCU_INV_PARAMETER_RW 0x0C1 //Sets inverter parameter r/w
+#define INV_VCU_RESPONSE_RW 0x0C2 //Responds back success of parameter r/w
+
 uint8_t TxData[CAN_DATA_SIZE] = {0};
 uint8_t RxData[CAN_DATA_SIZE] = {0};
 
 uint8_t HVCData[CAN_DATA_SIZE] = {0};
-uint8_t INVData[CAN_DATA_SIZE] = {0};
+int8_t INVTemp1Data[CAN_DATA_SIZE] = {0};
+int8_t INVTemp3Data[CAN_DATA_SIZE] = {0};
+uint8_t INVStateData[CAN_DATA_SIZE] = {0};
+uint8_t INVFaultData[CAN_DATA_SIZE] = {0};
+uint8_t INVParamsData[CAN_DATA_SIZE] = {0};
 uint8_t PDUData[CAN_DATA_SIZE] = {0};
 uint8_t WHSData[CAN_DATA_SIZE] = {0};
 
@@ -76,7 +92,7 @@ uint32_t Get_VCU_Inputs(VcuInput* input,
     return Critical_Error_Handler(ADC_DATA_FAULT);
   }
   // Request data from HVC, INV, PDU, WHS from CAN
-  init_TX(REQUEST_VCU_DATA_ID);
+  init_TX(VCU_REQUEST_DATA_ID);
   TxData[0] = 0x01;
   if (HAL_FDCAN_AddMessageToTxFifoQ(hfdcan1, &TxHeader, TxData) != HAL_OK) {
     return Critical_Error_Handler(VCU_DATA_FAULT);
@@ -153,9 +169,51 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     case HVC_RESPONSE_ID:
       copy(begin(RxData), end(RxData), HVCData);
       break;
-    case INV_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), INVData);
+
+    case INV_TEMP1_DATA:
+      copy(begin(RxData), end(RxData), INVTemp1Data);
       break;
+    case INV_TEMP3_DATA:
+      copy(begin(RxData), end(RxData), INVTemp3Data);
+      break;
+    case INV_MOTOR_POSITIONS:
+      motorInfo.motorAngle = ((RxData[0] << 8) + RxData[1]) * 10;
+      motorInfo.motorVelocity = ((RxData[2] << 8) + RxData[3]);
+      inverterInfo.inverterFrequency = ((RxData[4] << 8) + RxData[5]) * 10;
+      motorInfo.resolverAngle = ((RxData[6] << 8) + RxData[7]) * 10;
+      break;
+    case INV_CURRENT:
+      inverterInfo.phaseACurrent = ((RxData[0] << 8) + RxData[1]) * 10;
+      inverterInfo.phaseBCurrent = ((RxData[2] << 8) + RxData[3]) * 10;
+      inverterInfo.phaseCCurrent = ((RxData[4] << 8) + RxData[5]) * 10;
+      inverterInfo.busCurrent = ((RxData[6] << 8) + RxData[7]) * 10;
+      break;
+    case INV_VOLTAGE:
+      inverterInfo.busVoltage = ((RxData[0] << 8) + RxData[1]) * 10;
+      inverterInfo.outputVoltage = ((RxData[2] << 8) + RxData[3]) * 10;
+      inverterInfo.ABVoltage = ((RxData[4] << 8) + RxData[5]) * 10;
+      inverterInfo.BCVoltage = ((RxData[6] << 8) + RxData[7]) * 10;
+      break;
+    case INV_STATE_CODES:
+      copy(begin(RxData), end(RxData), INVStateData);
+      break;
+    case INV_FAULT_CODES:
+      copy(begin(RxData), end(RxData), INVFaultData);
+      break;
+    case INV_TORQUE_TIMER:
+      inverterInfo.torqueCommand = ((RxData[0] << 8) + RxData[1]) * 10;
+      inverterInfo.torqueFeedback = ((RxData[2] << 8) + RxData[3]) * 10;
+      break;
+    case INV_HIGH_SPEED_MSG:
+      inverterInfo.torqueCommand = ((RxData[0] << 8) + RxData[1]) * 10;
+      inverterInfo.torqueFeedback = ((RxData[2] << 8) + RxData[3]) * 10;
+      motorInfo.motorVelocity = (RxData[4] << 8) + RxData[5];
+      inverterInfo.busVoltage = ((RxData[6] << 8) + RxData[7]) * 10;
+      break;
+    case INV_VCU_RESPONSE_RW:
+      copy(begin(RxData), end(RxData), INVParamsData);
+      break;
+
     case PDU_RESPONSE_ID:
       copy(begin(RxData), end(RxData), PDUData);
       break;
@@ -204,16 +262,26 @@ int update_HVC(VcuInput* input){
 }
 
 int update_INV(VcuInput* input){
-  if(INVData[2] == 0){
-    return 1;
+  int8_t module_Atemp = (INVTemp1Data[0] << 8) + INVTemp1Data[1];
+  int8_t module_Btemp = (INVTemp1Data[2] << 8) + INVTemp1Data[3];
+  int8_t module_Ctemp = (INVTemp1Data[4] << 8) + INVTemp1Data[5];
+  input->inverterTemp = max(module_Atemp * 10.0f, max(module_Btemp * 10.0f, module_Ctemp * 10.0f));
+  input->motorTemp = ((INVTemp3Data[4] << 8) + INVTemp3Data[5]) * 10.0f;
+
+  uint64_t result_state, result_fault = 0x0;
+  for(int i = 7; i >= 0; i--){
+    result_state = (result_state << 8) | INVStateData[i];
+    result_fault = (result_fault << 8) | INVFaultData[i];
   }
-  input->inverterTemp = INVData[0];
-  input->motorTemp = INVData[1];
+  inv_state_vector = result_state;
+  inv_fault_vector = result_fault;
+
+  input->inverterReady = (bool) (inv_fault_vector == 0x0);
   return 0;
 }
 
 int update_PDU(VcuInput* input){
-  if(INVData[0] == 0){
+  if(PDUData[0] == 0){
     return 1;
   }
   return 0;

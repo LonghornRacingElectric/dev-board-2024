@@ -10,6 +10,13 @@
 static uint32_t vcu_fault_vector = 0x0;
 static uint32_t global_shutdown = 0;
 
+static uint64_t inv_fault_vector = 0x0;
+static uint64_t inv_state_vector = 0x0;
+
+static uint32_t hvc_fault_vector = 0x0;
+
+static uint32_t pdu_fault_vector = 0x0;
+
 typedef struct {
   int BrakePressed;
   int BrakeBroken;
