@@ -21,6 +21,7 @@
 
 
 #include "GetVCUInputs.h"
+#include "globals.h"
 #include <algorithm>
 #include <cstdio>
 
@@ -244,7 +245,7 @@ void init_TX(uint32_t identifier){
   TxHeader.Identifier = identifier;
   TxHeader.IdType = FDCAN_STANDARD_ID;
   TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-  TxHeader.DataLength = FDCAN_DLC_BYTES_16;
+  TxHeader.DataLength = FDCAN_DLC_BYTES_8;
   TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
   TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
   TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
