@@ -23,14 +23,11 @@
 
 
 uint32_t Get_VCU_Inputs(VcuInput* , VcuParameters*, ADC_HandleTypeDef* , FDCAN_HandleTypeDef* , SPI_HandleTypeDef* , UART_HandleTypeDef* );
-void init_TX(uint32_t);
 int update_HVC(VcuInput* );
 int update_INV(VcuInput* );
 int update_PDU(VcuInput* );
 int update_WHS(VcuInput* );
 int update_IMU(VcuInput* );
-int Critical_Error_Handler(uint32_t );
-int Noncritical_Error_Handler(uint32_t );
 
 
 

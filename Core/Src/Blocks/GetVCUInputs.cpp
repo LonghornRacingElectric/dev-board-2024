@@ -86,14 +86,13 @@ uint32_t Get_VCU_Inputs(VcuInput* input,
                         FDCAN_HandleTypeDef* hfdcan1,
                         SPI_HandleTypeDef* hspi1,
                         UART_HandleTypeDef* huart1){
-  uint32_t this_shutdown = 0;
 
   // Start polling ADC Data
   if(HAL_ADC_Start_DMA(hadc1, (uint32_t*)adcData, ADC_BUF_SIZE) != HAL_OK){
     return Critical_Error_Handler(ADC_DATA_FAULT);
   }
   // Request data from HVC, INV, PDU, WHS from CAN
-  init_TX(VCU_REQUEST_DATA_ID);
+  init_TX(&TxHeader, VCU_REQUEST_DATA_ID);
   TxData[0] = 0x01;
   if (HAL_FDCAN_AddMessageToTxFifoQ(hfdcan1, &TxHeader, TxData) != HAL_OK) {
     return Critical_Error_Handler(VCU_DATA_FAULT);
@@ -241,18 +240,6 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
   }
 }
 
-void init_TX(uint32_t identifier){
-  TxHeader.Identifier = identifier;
-  TxHeader.IdType = FDCAN_STANDARD_ID;
-  TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-  TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-  TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-  TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-  TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
-  TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-  TxHeader.MessageMarker = 0;
-}
-
 int update_HVC(VcuInput* input){
   if(HVCData[2] == 0){
     return 1;
@@ -321,16 +308,5 @@ int update_IMU(VcuInput* input){
 
 
 
-  return 0;
-}
-
-int Critical_Error_Handler(uint32_t fault_type){
-  global_shutdown = 1;
-  set_fault(fault_type);
-  return 1;
-}
-
-int Noncritical_Error_Handler(uint32_t fault_type){
-  set_fault(fault_type);
   return 0;
 }

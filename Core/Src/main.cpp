@@ -25,11 +25,11 @@
 #include "library.h"
 #include "firmware_faults.h"
 #include "GetVCUInputs.h"
+#include "GetTelemetry.h"
 #include "GetCELLInputs.h"
 #include "GetBSPDOutputs.h"
 #include "SetCoreFaults.h"
 #include "SendCANOutput.h"
-#include "SendDASHOutput.h"
 #include "SendOutResults.h"
 #include <cstdio>
 /* USER CODE END Includes */
@@ -172,12 +172,10 @@ int main(void)
 
     int bspd_rx_error = Get_BSPD_Outputs(&bspd);
 
-    uint32_t vcu_output_error = Send_CAN_Output(&vcuOutput, &bspd);
+    uint32_t vcu_output_error = Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, &bspd, &hfdcan1);
     if(global_shutdown){
       //GPIO write
     }
-
-    int dash_tx_error = Send_DASH_Output(&vcuInput, &vcuOutput, &bspd);
 
     int tx_error = Send_Out_Results(&vcuInput, &vcuParameters, &vcuOutput, &bspd, last_time_recorded);
 
