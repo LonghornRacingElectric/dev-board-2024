@@ -21,54 +21,12 @@
 
 
 #include "GetVCUInputs.h"
+#include "InterruptHandlers.h"
 #include "globals.h"
 #include <algorithm>
 #include <cstdio>
 
 using namespace std;
-
-uint16_t adcData[ADC_BUF_SIZE];
-
-FDCAN_TxHeaderTypeDef TxHeader;
-FDCAN_RxHeaderTypeDef RxHeader;
-#define VCU_REQUEST_DATA_ID 0x100
-#define HVC_RESPONSE_ID 0x110
-#define HVC_IMU2_RESPONSE_ID 0x111
-#define INV_RESPONSE_ID 0x120
-#define PDU_RESPONSE_ID 0x130
-#define PDU_IMU3_RESPONSE_ID 0x131
-#define WHS1_RESPONSE_ID 0x140
-#define WHS2_RESPONSE_ID 0x150
-#define WHS3_RESPONSE_ID 0x160
-#define WHS4_RESPONSE_ID 0x170
-
-#define INV_TEMP1_DATA 0x0A0 //Stores inverter module temperature
-#define INV_TEMP3_DATA 0x0A2 //Stores motor temperature
-#define INV_MOTOR_POSITIONS 0x0A5 //Stores motor position
-#define INV_CURRENT 0x0A6 //Stores motor velocity
-#define INV_VOLTAGE 0x0A7 //Stores motor voltage
-#define INV_STATE_CODES 0x0AA //Stores inverter state codes
-#define INV_FAULT_CODES 0x0AB //Stores inverter fault codes
-#define INV_TORQUE_TIMER 0x0AC //Stores inverter torque results
-#define INV_HIGH_SPEED_MSG 0x0B0 //Stores inverter high speed message
-#define VCU_INV_COMMAND 0x0C0 //Stores inverter command
-#define VCU_INV_PARAMETER_RW 0x0C1 //Sets inverter parameter r/w
-#define INV_VCU_RESPONSE_RW 0x0C2 //Responds back success of parameter r/w
-
-uint8_t TxData[CAN_DATA_SIZE] = {0};
-uint8_t RxData[CAN_DATA_SIZE] = {0};
-
-uint8_t HVCData[CAN_DATA_SIZE] = {0};
-int8_t INVTemp1Data[CAN_DATA_SIZE] = {0};
-int8_t INVTemp3Data[CAN_DATA_SIZE] = {0};
-uint8_t INVStateData[CAN_DATA_SIZE] = {0};
-uint8_t INVFaultData[CAN_DATA_SIZE] = {0};
-uint8_t INVParamsData[CAN_DATA_SIZE] = {0};
-uint8_t PDUData[CAN_DATA_SIZE] = {0};
-uint8_t WHSData[CAN_DATA_SIZE] = {0};
-
-uint8_t IMU2Data[CAN_DATA_SIZE] = {0};
-uint8_t IMU3Data[CAN_DATA_SIZE] = {0};
 
 float IMUACCELSCALAR = 0;
 float IMUGYROSCALAR = 0;
@@ -82,25 +40,28 @@ uint8_t RxSPI[SPI_BUF_SIZE] = {0};
 
 uint32_t Get_VCU_Inputs(VcuInput* input,
                         VcuParameters* params,
-                        ADC_HandleTypeDef* hadc1,
-                        FDCAN_HandleTypeDef* hfdcan1,
-                        SPI_HandleTypeDef* hspi1,
-                        UART_HandleTypeDef* huart1){
+                        ADC_HandleTypeDef* hadc,
+                        FDCAN_HandleTypeDef* hfdcan,
+                        SPI_HandleTypeDef* hspi,
+                        UART_HandleTypeDef* huart){
 
-  // Start polling ADC Data
-  if(HAL_ADC_Start_DMA(hadc1, (uint32_t*)adcData, ADC_BUF_SIZE) != HAL_OK){
-    return Critical_Error_Handler(ADC_DATA_FAULT);
+  //Request data from IMU
+  if(HAL_SPI_Transmit_IT(hspi, (uint8_t*)TxSPI, SPI_BUF_SIZE) != HAL_OK){
+    return Critical_Error_Handler(IMU_DATA_FAULT);
   }
-  // Request data from HVC, INV, PDU, WHS from CAN
-  init_TX(&TxHeader, VCU_REQUEST_DATA_ID);
-  TxData[0] = 0x01;
-  if (HAL_FDCAN_AddMessageToTxFifoQ(hfdcan1, &TxHeader, TxData) != HAL_OK) {
+
+  //Send out VCU Request Data
+  sprintf((char*)Tx0Data, "urmom");
+  init_TX(&Tx0Header, VCU_REQUEST_DATA_ID);
+  if(HAL_FDCAN_AddMessageToTxFifoQ(hfdcan, &Tx0Header, reinterpret_cast<uint8_t *>(Tx0Data)) != HAL_OK){
     return Critical_Error_Handler(VCU_DATA_FAULT);
   }
 
-  //Request data from IMU
-  HAL_SPI_Transmit_IT(hspi1, (uint8_t*)TxSPI, SPI_BUF_SIZE);
-  HAL_Delay(1);
+  // Request data from GPS UART (or cell module)
+  sprintf((char*)TxUARTCmds, "Give me the data");
+  if(HAL_UART_Transmit_IT(huart, (uint8_t*)TxUARTCmds, UART_BUF_SIZE) != HAL_OK){
+    return Critical_Error_Handler(GPS_DATA_FAULT);
+  }
 
   input->apps1 = adcData[APPS1_CHANNEL] * params->apps1VoltageMax / 65536.0;
   input->apps2 = adcData[APPS2_CHANNEL] * params->apps2VoltageMax / 65536.0;
@@ -108,16 +69,12 @@ uint32_t Get_VCU_Inputs(VcuInput* input,
   input->bse2 = adcData[BSE2_CHANNEL] * params->bseVoltageMax / 65536.0;
   input->steeringWheelPotVoltage = adcData[STEER_CHANNEL] * 5.0 / 65536.0;
 
-  if(HAL_ADC_Stop_DMA(hadc1) != HAL_OK){
-    return Critical_Error_Handler(ADC_DATA_FAULT);
-  }
-
   // Next with UART
   // Start DMA with UART now
-  sprintf((char*)TxUARTCmds, "Give me the data");
 
-  HAL_UART_Transmit_IT(huart1, (uint8_t*)TxUARTCmds, UART_BUF_SIZE);
-  HAL_UART_Receive_IT(huart1, (uint8_t*)RxUARTCmds, UART_BUF_SIZE);
+  if(HAL_UART_Receive_IT(huart, (uint8_t*)RxUARTCmds, UART_BUF_SIZE) != HAL_OK){
+    return Critical_Error_Handler(GPS_DATA_FAULT);
+  }
 
   return 0;
   // Set data from HVC, INV, PDU, WHS from CAN
@@ -140,7 +97,7 @@ uint32_t Get_VCU_Inputs(VcuInput* input,
   }
 
   // Next with SPI (synchronous)
-  HAL_SPI_Receive_IT(hspi1, (uint8_t*)RxSPI, SPI_BUF_SIZE);
+  HAL_SPI_Receive_IT(hspi, (uint8_t*)RxSPI, SPI_BUF_SIZE);
 
 
 
@@ -151,93 +108,10 @@ uint32_t Get_VCU_Inputs(VcuInput* input,
     return 0;
 }
 
-void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs){
-  if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == RESET){
-    return;
-  }
-  if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &RxHeader, RxData) != HAL_OK)
-  {
-      /* Reception Error */
-    Critical_Error_Handler(GENERIC_CAN_DATA_FAULT);
-  }
-  if (HAL_FDCAN_ActivateNotification(hfdcan, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-  {
-      /* Notification Error */
-      Critical_Error_Handler(VCU_DATA_FAULT);
-  }
-  switch (RxHeader.Identifier){
-    case HVC_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), HVCData);
-      break;
-
-    case INV_TEMP1_DATA:
-      copy(begin(RxData), end(RxData), INVTemp1Data);
-      break;
-    case INV_TEMP3_DATA:
-      copy(begin(RxData), end(RxData), INVTemp3Data);
-      break;
-    case INV_MOTOR_POSITIONS:
-      motorInfo.motorAngle = ((RxData[0] << 8) + RxData[1]) * 10;
-      motorInfo.motorVelocity = ((RxData[2] << 8) + RxData[3]);
-      inverterInfo.inverterFrequency = ((RxData[4] << 8) + RxData[5]) * 10;
-      motorInfo.resolverAngle = ((RxData[6] << 8) + RxData[7]) * 10;
-      break;
-    case INV_CURRENT:
-      inverterInfo.phaseACurrent = ((RxData[0] << 8) + RxData[1]) * 10;
-      inverterInfo.phaseBCurrent = ((RxData[2] << 8) + RxData[3]) * 10;
-      inverterInfo.phaseCCurrent = ((RxData[4] << 8) + RxData[5]) * 10;
-      inverterInfo.busCurrent = ((RxData[6] << 8) + RxData[7]) * 10;
-      break;
-    case INV_VOLTAGE:
-      inverterInfo.busVoltage = ((RxData[0] << 8) + RxData[1]) * 10;
-      inverterInfo.outputVoltage = ((RxData[2] << 8) + RxData[3]) * 10;
-      inverterInfo.ABVoltage = ((RxData[4] << 8) + RxData[5]) * 10;
-      inverterInfo.BCVoltage = ((RxData[6] << 8) + RxData[7]) * 10;
-      break;
-    case INV_STATE_CODES:
-      copy(begin(RxData), end(RxData), INVStateData);
-      break;
-    case INV_FAULT_CODES:
-      copy(begin(RxData), end(RxData), INVFaultData);
-      break;
-    case INV_TORQUE_TIMER:
-      inverterInfo.torqueCommand = ((RxData[0] << 8) + RxData[1]) * 10;
-      inverterInfo.torqueFeedback = ((RxData[2] << 8) + RxData[3]) * 10;
-      break;
-    case INV_HIGH_SPEED_MSG:
-      inverterInfo.torqueCommand = ((RxData[0] << 8) + RxData[1]) * 10;
-      inverterInfo.torqueFeedback = ((RxData[2] << 8) + RxData[3]) * 10;
-      motorInfo.motorVelocity = (RxData[4] << 8) + RxData[5];
-      inverterInfo.busVoltage = ((RxData[6] << 8) + RxData[7]) * 10;
-      break;
-    case INV_VCU_RESPONSE_RW:
-      copy(begin(RxData), end(RxData), INVParamsData);
-      break;
-
-    case PDU_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), PDUData);
-      break;
-    case WHS1_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), WHSData);
-      break;
-    case WHS2_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), WHSData + 4);
-      break;
-    case WHS3_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), WHSData + 8);
-      break;
-    case WHS4_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), WHSData + 12);
-      break;
-    case HVC_IMU2_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), IMU2Data);
-      break;
-    case PDU_IMU3_RESPONSE_ID:
-      copy(begin(RxData), end(RxData), IMU3Data);
-      break;
-    default:
-      break;
-  }
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+  HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_1);
+  // Checks if the interrupt is from the correct UART
 }
 
 int update_HVC(VcuInput* input){

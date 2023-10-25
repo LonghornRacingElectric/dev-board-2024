@@ -10,6 +10,7 @@
 #include "VcuModel.h"
 #include "library.h"
 #include "stm32h7xx_hal.h"
+#include <cmath>
 
 uint32_t Send_CAN_Output(VcuInput* , VcuOutput* , VcuParameters* , BSPD* , FDCAN_HandleTypeDef* );
 

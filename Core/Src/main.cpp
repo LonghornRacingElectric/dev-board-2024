@@ -57,8 +57,8 @@ FDCAN_HandleTypeDef hfdcan1;
 
 SPI_HandleTypeDef hspi1;
 
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
-DMA_HandleTypeDef hdma_usart3_rx;
 
 /* USER CODE BEGIN PV */
 
@@ -74,6 +74,7 @@ static void MX_FDCAN1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_UART4_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -121,6 +122,7 @@ int main(void)
   MX_ADC1_Init();
   MX_USART3_UART_Init();
   MX_SPI1_Init();
+  MX_UART4_Init();
   /* USER CODE BEGIN 2 */
 
   volatile uint32_t last_time_recorded = 0;
@@ -142,18 +144,24 @@ int main(void)
     Critical_Error_Handler(VCU_DATA_FAULT);
   }
 
+  HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
+  // Start polling ADC Data
+  if(HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adcData, ADC_BUF_SIZE) != HAL_OK){
+    Critical_Error_Handler(ADC_DATA_FAULT);
+  }
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-    uint32_t vcu_input_error = Get_VCU_Inputs(&vcuInput, &vcuParameters, &hadc1, &hfdcan1, &hspi1, &huart3);
+    uint32_t vcu_input_error = Get_VCU_Inputs(&vcuInput, &vcuParameters, &hadc1, &hfdcan1, &hspi1, &huart4);
     if(vcu_input_error){
-      HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14);
+      // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14);
     }
     if(global_shutdown){
       vcuInput.inverterReady = false;
-      //GPIO write shutdown signal
+      //GPIO write to  LED shutdown signal
     }
     else{
       vcuInput.inverterReady = true;
@@ -165,6 +173,8 @@ int main(void)
     last_time_recorded = HAL_GetTick();
     vcuModel.evaluate(&vcuInput, &vcuOutput,  (float)delta_time / 1000.0f);
 
+    clear_all_faults();
+    HAL_Delay(500);
     continue;
 
     uint32_t fault_error = Set_Core_Faults(&vcuOutput);
@@ -179,8 +189,7 @@ int main(void)
 
     int tx_error = Send_Out_Results(&vcuInput, &vcuParameters, &vcuOutput, &bspd, last_time_recorded);
 
-    clear_all_faults();
-    HAL_Delay(100);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -389,8 +398,8 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.RxFifo0ElmtsNbr = 1;
   hfdcan1.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_32;
-  hfdcan1.Init.RxFifo1ElmtsNbr = 0;
-  hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_16;
+  hfdcan1.Init.RxFifo1ElmtsNbr = 1;
+  hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_32;
   hfdcan1.Init.RxBuffersNbr = 0;
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.TxEventsNbr = 0;
@@ -453,6 +462,54 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart4, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart4, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
 
 }
 
@@ -538,9 +595,6 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-  /* DMA1_Stream1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 
 }
 
@@ -646,8 +700,8 @@ void Error_Handler(void)
     /* User can add his own implementation to report the HAL error return state */
     __disable_irq();
     while (1) {
-      HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
-      HAL_Delay(500);
+      //Write to Red LED
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
     }
   /* USER CODE END Error_Handler_Debug */
 }
