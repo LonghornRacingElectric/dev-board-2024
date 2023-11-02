@@ -23,8 +23,9 @@
 /* USER CODE BEGIN Includes */
 #include "VcuModel.h"
 #include "library.h"
+#include "analog.h"
+#include "gps.h"
 #include "firmware_faults.h"
-#include "GetVCUInputs.h"
 #include "GetTelemetry.h"
 #include "GetCELLInputs.h"
 #include "GetBSPDOutputs.h"
@@ -144,9 +145,7 @@ int main(void)
     Critical_Error_Handler(VCU_DATA_FAULT);
   }
 
-  HAL_ADCEx_Calibration_Start(&hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
-  // Start polling ADC Data
-  if(HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adcData, ADC_BUF_SIZE) != HAL_OK){
+  if(Init_Analog(&hadc1) != 0){
     Critical_Error_Handler(ADC_DATA_FAULT);
   }
 
@@ -155,42 +154,40 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-    uint32_t vcu_input_error = Get_VCU_Inputs(&vcuInput, &vcuParameters, &hadc1, &hfdcan1, &hspi1, &huart4);
-    if(vcu_input_error){
-      // HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14);
-    }
-    if(global_shutdown){
-      vcuInput.inverterReady = false;
-      //GPIO write to  LED shutdown signal
-    }
-    else{
-      vcuInput.inverterReady = true;
-    }
-
-    // int cellular_rx_error = Get_CELL_Inputs(&vcuParameters);
-
-    uint32_t delta_time = HAL_GetTick() - last_time_recorded; // in ms
-    last_time_recorded = HAL_GetTick();
-    vcuModel.evaluate(&vcuInput, &vcuOutput,  (float)delta_time / 1000.0f);
-
-    clear_all_faults();
-    HAL_Delay(500);
-    continue;
-
-    uint32_t fault_error = Set_Core_Faults(&vcuOutput);
-    //GPIO write shutdown signal
-
-    int bspd_rx_error = Get_BSPD_Outputs(&bspd);
-
-    uint32_t vcu_output_error = Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, &bspd, &hfdcan1);
-    if(global_shutdown){
-      //GPIO write
-    }
-
-    int tx_error = Send_Out_Results(&vcuInput, &vcuParameters, &vcuOutput, &bspd, last_time_recorded);
-
-
     /* USER CODE END WHILE */
+
+    //Get Analog Inputs from ADC
+    if(Get_Analog(&hadc1, &vcuInput, &vcuParameters) != 0){
+      Critical_Error_Handler(ADC_DATA_FAULT);
+    }
+
+    // Get GPS Inputs
+    if(Get_GPS_Response(&huart4, &vcuInput) != 0){
+      Critical_Error_Handler(GPS_DATA_FAULT);
+    }
+
+    // Get IMU_internal Inputs
+
+    // Get HVC, PDU, IMU_external, WHS, INV Inputs
+
+    //If new data, get new data from Cell
+
+    // Upload to VCU Core
+
+    // Run VCU Core
+
+    // Send torque command
+
+    // Send extraneous info (e.g. PDU)
+
+    // Get BSPD Data
+
+    // Get Telemetry Data
+
+    // Send Telemetry Data
+
+
+
 
     /* USER CODE BEGIN 3 */
 
