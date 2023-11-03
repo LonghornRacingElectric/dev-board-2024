@@ -58,6 +58,8 @@ FDCAN_HandleTypeDef hfdcan1;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim3;
+
 UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
 
@@ -76,6 +78,7 @@ static void MX_ADC1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_UART4_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -124,6 +127,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_SPI1_Init();
   MX_UART4_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
 //  volatile uint32_t last_time_recorded = 0;
@@ -145,9 +149,47 @@ int main(void)
 //    Critical_Error_Handler(VCU_DATA_FAULT);
 //  }
 
+  vcuParameters.appsLowPassFilterTimeConstant = 0.000f;
+  vcuParameters.appsImplausibilityTime = 0.100f;
+  vcuParameters.appsPlausibilityRange = 0.10f;
+  vcuParameters.apps1VoltageMin = 0.0f;
+  vcuParameters.apps1VoltageMax = 3.3f;
+  vcuParameters.apps2VoltageMin = 0.0f;
+  vcuParameters.apps2VoltageMax = 3.3f;
+  vcuParameters.appsDeadZonePct = 0.05f;
+
+  vcuParameters.bseLowPassFilterTimeConstant = 0.00f;
+  vcuParameters.bseImplausibilityTime = 0.100f;
+  vcuParameters.bseVoltageMin = 0.0f;
+  vcuParameters.bseVoltageMax = 3.3f;
+  vcuParameters.bsePressureMin = 0.0f;
+  vcuParameters.bsePressureMax = 1000.0f;
+
+  vcuParameters.stomppMechanicalBrakesThreshold = 100.0f;
+  vcuParameters.stomppAppsCutoffThreshold = 0.25f;
+  vcuParameters.stomppAppsRecoveryThreshold = 0.05f;
+
+  vcuParameters.mapPedalToTorqueRequest = CurveParameter(1.0f, 230.0f);
+  vcuParameters.mapDerateMotorTemp = CurveParameter();
+  vcuParameters.mapDerateInverterTemp = CurveParameter();
+  vcuParameters.mapDerateBatteryTemp = CurveParameter();
+  vcuParameters.mapDerateBatterySoc = CurveParameter();
+
+  vcuParameters.prndlBrakeToStartThreshold = 100.0f;
+  vcuParameters.prndlBuzzerDuration = 2.0f;
+  vcuParameters.prndlSwitchDebounceDuration = 0.100f;
+
+  vcuModel.setParameters(&vcuParameters);
+
+  // left out steering initialization for now
+
   if(Init_Analog(&hadc1) != 0){
     Critical_Error_Handler(ADC_DATA_FAULT);
   }
+
+  HAL_GPIO_WritePin(CAN_TERM_GPIO_Port, CAN_TERM_Pin, GPIO_PIN_SET);
+
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
   /* USER CODE END 2 */
 
@@ -158,9 +200,16 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     Get_Analog(&vcuInput, &vcuParameters);
+    vcuInput.driveSwitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3);
+    vcuInput.inverterReady = true;
+
     vcuModel.evaluate(&vcuInput, &vcuOutput, 0.003f);
 
+    htim3.Instance->CCR3 = (uint16_t) (vcuOutput.inverterTorqueRequest / 230.0f * 65535.0f);
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) !vcuOutput.prndlState);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) (vcuOutput.faultApps || vcuOutput.faultBse || vcuOutput.faultStompp));
 
+    Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
 
   }
   /* USER CODE END 3 */
@@ -425,6 +474,66 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  __HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_3);
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
   * @brief UART4 Initialization Function
   * @param None
   * @retval None
@@ -582,7 +691,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOF, USB_FS_PWR_EN_Pin|CAN_TERM_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
@@ -600,24 +709,24 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD1_Pin LD3_Pin PB6 */
-  GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|GPIO_PIN_6;
+  /*Configure GPIO pins : PA3 USB_FS_VBUS_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|USB_FS_VBUS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LD3_Pin */
+  GPIO_InitStruct.Pin = LD3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_FS_OVCR_Pin */
   GPIO_InitStruct.Pin = USB_FS_OVCR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_FS_OVCR_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : USB_FS_VBUS_Pin */
-  GPIO_InitStruct.Pin = USB_FS_VBUS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(USB_FS_VBUS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_FS_ID_Pin */
   GPIO_InitStruct.Pin = USB_FS_ID_Pin;
