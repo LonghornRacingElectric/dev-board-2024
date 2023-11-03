@@ -126,24 +126,24 @@ int main(void)
   MX_UART4_Init();
   /* USER CODE BEGIN 2 */
 
-  volatile uint32_t last_time_recorded = 0;
-  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
-  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(SysTick_IRQn);
-
-  BSPD bspd = {0, 0, 0, 0, 0};
-
-  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
-  {
-    Critical_Error_Handler(VCU_DATA_FAULT);
-  }
-  //Sets up interrupt for when we receive CAN data
-  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-  {
-    /* Notification Error */
-    Critical_Error_Handler(VCU_DATA_FAULT);
-  }
+//  volatile uint32_t last_time_recorded = 0;
+//  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+//  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+//  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+//  HAL_NVIC_EnableIRQ(SysTick_IRQn);
+//
+//  BSPD bspd = {0, 0, 0, 0, 0};
+//
+//  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
+//  {
+//    Critical_Error_Handler(VCU_DATA_FAULT);
+//  }
+//  //Sets up interrupt for when we receive CAN data
+//  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+//  {
+//    /* Notification Error */
+//    Critical_Error_Handler(VCU_DATA_FAULT);
+//  }
 
   if(Init_Analog(&hadc1) != 0){
     Critical_Error_Handler(ADC_DATA_FAULT);
@@ -156,40 +156,11 @@ int main(void)
   while (1) {
     /* USER CODE END WHILE */
 
-    //Get Analog Inputs from ADC
-    if(Get_Analog(&hadc1, &vcuInput, &vcuParameters) != 0){
-      Critical_Error_Handler(ADC_DATA_FAULT);
-    }
-
-    // Get GPS Inputs
-    if(Get_GPS_Response(&huart4, &vcuInput) != 0){
-      Critical_Error_Handler(GPS_DATA_FAULT);
-    }
-
-    // Get IMU_internal Inputs
-
-    // Get HVC, PDU, IMU_external, WHS, INV Inputs
-
-    //If new data, get new data from Cell
-
-    // Upload to VCU Core
-
-    // Run VCU Core
-
-    // Send torque command
-
-    // Send extraneous info (e.g. PDU)
-
-    // Get BSPD Data
-
-    // Get Telemetry Data
-
-    // Send Telemetry Data
-
-
-
-
     /* USER CODE BEGIN 3 */
+    Get_Analog(&vcuInput, &vcuParameters);
+    vcuModel.evaluate(&vcuInput, &vcuOutput, 0.003f);
+
+
 
   }
   /* USER CODE END 3 */
@@ -285,7 +256,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfConversion = 5;
+  hadc1.Init.NbrOfConversion = 4;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -308,7 +279,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Channel = ADC_CHANNEL_5;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
@@ -322,7 +293,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -331,7 +302,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -340,17 +311,8 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_10;
+  sConfig.Channel = ADC_CHANNEL_8;
   sConfig.Rank = ADC_REGULAR_RANK_4;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_11;
-  sConfig.Rank = ADC_REGULAR_RANK_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -617,7 +579,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(USB_FS_PWR_EN_GPIO_Port, USB_FS_PWR_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, USB_FS_PWR_EN_Pin|CAN_TERM_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
@@ -631,12 +593,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : USB_FS_PWR_EN_Pin */
-  GPIO_InitStruct.Pin = USB_FS_PWR_EN_Pin;
+  /*Configure GPIO pins : USB_FS_PWR_EN_Pin CAN_TERM_Pin */
+  GPIO_InitStruct.Pin = USB_FS_PWR_EN_Pin|CAN_TERM_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(USB_FS_PWR_EN_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LD1_Pin LD3_Pin PB6 */
   GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|GPIO_PIN_6;

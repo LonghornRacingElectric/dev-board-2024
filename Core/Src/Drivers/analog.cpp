@@ -4,26 +4,28 @@
 
 #include "analog.h"
 
-unsigned int Init_Analog(ADC_HandleTypeDef* hadc){
 
-  if(HAL_ADCEx_Calibration_Start(hadc, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK){
-    return 1;
-  }
-  // Start polling ADC Data
-  if(HAL_ADC_Start_DMA(hadc, (uint32_t*)adcData, 5) != HAL_OK){
-    return 1;
-  }
+static uint16_t adc1Dma[4];
 
-  return 0;
+unsigned int Init_Analog(ADC_HandleTypeDef *hadc1) {
+
+    if (HAL_ADCEx_Calibration_Start(hadc1, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED) != HAL_OK) {
+        return 1;
+    }
+    if (HAL_ADCEx_MultiModeStart_DMA(hadc1, (uint32_t *) adc1Dma, 4) != HAL_OK) {
+        return 1;
+    }
+
+    return 0;
 }
 
-unsigned int Get_Analog(ADC_HandleTypeDef* hadc, VcuInput* input, VcuParameters* params){
+unsigned int Get_Analog(VcuInput *input, VcuParameters *params) {
 
-  input->apps1 = (float) (adcData[APPS1_CHANNEL] * 3.3 / 65536.0);
-  input->apps2 = (float) (adcData[APPS2_CHANNEL] * 3.3 / 65536.0);
-  input->bse1 = (float) (adcData[BSE1_CHANNEL] * 3.3 / 65536.0);
-  input->bse2 = (float) (adcData[BSE2_CHANNEL] * 3.3 / 65536.0);
-  input->steeringWheelPotVoltage = (float) (adcData[STEER_CHANNEL] * 3.3 / 65536.0);
+  input->apps1 = (float) (adc1Dma[3]) * 3.3f / 65536.0f;
+  input->apps2 = (float) (adc1Dma[0]) * 3.3f / 65536.0f;
+  input->bse1 = (float) (adc1Dma[2]) * 3.3f / 65536.0f;
+  input->bse2 = (float) (adc1Dma[1]) * 3.3f / 65536.0f;
+//  input->steeringWheelPotVoltage = (float) (adcData[STEER_CHANNEL] * 3.3 / 65536.0);
 
-  return 0;
+    return 0;
 }

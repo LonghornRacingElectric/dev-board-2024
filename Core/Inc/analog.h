@@ -9,16 +9,8 @@
 #include "VcuModel.h"
 #include "library.h"
 
-#define APPS1_CHANNEL 0
-#define APPS2_CHANNEL 1
-#define BSE1_CHANNEL 2
-#define BSE2_CHANNEL 3
-#define STEER_CHANNEL 4
+unsigned int Init_Analog(ADC_HandleTypeDef *hadc1);
 
-static uint16_t adcData[5] = {0};
-
-unsigned int Init_Analog(ADC_HandleTypeDef *hadc);
-
-unsigned int Get_Analog(ADC_HandleTypeDef *hadc, VcuInput* input, VcuParameters* params);
+unsigned int Get_Analog(VcuInput* input, VcuParameters* params);
 
 #endif //VCU_FIRMWARE_2024_ANALOG_H

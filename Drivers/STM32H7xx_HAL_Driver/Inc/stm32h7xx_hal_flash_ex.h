@@ -739,7 +739,7 @@ typedef struct
 #define FLASH_OTP_BLOCK_13         0x00002000U /*!< OTP Block13    */
 #define FLASH_OTP_BLOCK_14         0x00004000U /*!< OTP Block14    */
 #define FLASH_OTP_BLOCK_15         0x00008000U /*!< OTP Block15    */
-#define FLASH_OTP_BLOCK_ALL        0x0000FFFFU /*!< OTP All Drivers */
+#define FLASH_OTP_BLOCK_ALL        0x0000FFFFU /*!< OTP All Blocks */
 /**
   * @}
   */
