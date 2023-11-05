@@ -8,15 +8,13 @@
 #include <cstdint>
 
 static uint32_t vcu_fault_vector = 0x0;
-static uint32_t global_shutdown = 0;
 
-typedef struct {
-  int BrakePressed;
-  int BrakeBroken;
-  int MotorON;
-  int MotorPressed;
-  int BSPDShutdown;
-} BSPD;
+static uint64_t inv_fault_vector = 0x0; //will be sent by Inverter and updated occasionally
+static uint64_t inv_state_vector = 0x0; //will be sent by Inverter and updated occasionally
+
+static uint32_t hvc_fault_vector = 0x0; //will be sent by HVC and updated occasionally
+
+static uint32_t pdu_fault_vector = 0x0; //will be sent by PDU and updated occasionally
 
 //Core Faults which are derived from VCU CORE Outputs, see Libs/VcuCore/src/VcuModel.h
 #define APPS_FAULT 0x00000001
@@ -28,7 +26,7 @@ typedef struct {
 #define STEERING_FAULT 0x0000040
 
 //Write faults where data cannot be trasmitted
-#define DRS_DATA_FAULT 0x00000100
+#define DRS_DATA_FAULT 0x00000100 //Will not be used cause Aero can't do it, sad
 #define TORQUEREQUEST_DATA_FAULT 0x00000200
 #define CARDIAGNOSTICS_DATA_FAULT 0x00000400
 
@@ -41,7 +39,8 @@ typedef struct {
 #define INVERTER_DATA_FAULT 0x04000000
 #define HVC_DATA_FAULT 0x08000000
 #define PDU_DATA_FAULT 0x10000000
-#define GENERIC_CAN_DATA_FAULT 0x20000000
+#define DASH_DATA_FAULT 0x20000000
+#define GENERIC_CAN_DATA_FAULT 0x80000000
 #define VCU_DATA_FAULT 0x40000000
 
 #define set_fault(fault) vcu_fault_vector |= fault

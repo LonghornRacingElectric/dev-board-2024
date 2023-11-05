@@ -23,13 +23,14 @@
 /* USER CODE BEGIN Includes */
 #include "VcuModel.h"
 #include "library.h"
+#include "analog.h"
+#include "gps.h"
 #include "firmware_faults.h"
-#include "GetVCUInputs.h"
+#include "GetTelemetry.h"
 #include "GetCELLInputs.h"
 #include "GetBSPDOutputs.h"
 #include "SetCoreFaults.h"
 #include "SendCANOutput.h"
-#include "SendDASHOutput.h"
 #include "SendOutResults.h"
 #include <cstdio>
 /* USER CODE END Includes */
@@ -57,8 +58,10 @@ FDCAN_HandleTypeDef hfdcan1;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim3;
+
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart3;
-DMA_HandleTypeDef hdma_usart3_rx;
 
 /* USER CODE BEGIN PV */
 
@@ -74,6 +77,8 @@ static void MX_FDCAN1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_UART4_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -121,71 +126,90 @@ int main(void)
   MX_ADC1_Init();
   MX_USART3_UART_Init();
   MX_SPI1_Init();
+  MX_UART4_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
-  volatile uint32_t last_time_recorded = 0;
-  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
-  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(SysTick_IRQn);
+//  volatile uint32_t last_time_recorded = 0;
+//  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+//  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+//  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+//  HAL_NVIC_EnableIRQ(SysTick_IRQn);
+//
+//  BSPD bspd = {0, 0, 0, 0, 0};
+//
+//  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
+//  {
+//    Critical_Error_Handler(VCU_DATA_FAULT);
+//  }
+//  //Sets up interrupt for when we receive CAN data
+//  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+//  {
+//    /* Notification Error */
+//    Critical_Error_Handler(VCU_DATA_FAULT);
+//  }
 
-  BSPD bspd = {0, 0, 0, 0, 0};
+  vcuParameters.appsLowPassFilterTimeConstant = 0.000f;
+  vcuParameters.appsImplausibilityTime = 0.100f;
+  vcuParameters.appsPlausibilityRange = 0.10f;
+  vcuParameters.apps1VoltageMin = 0.0f;
+  vcuParameters.apps1VoltageMax = 3.3f;
+  vcuParameters.apps2VoltageMin = 0.0f;
+  vcuParameters.apps2VoltageMax = 3.3f;
+  vcuParameters.appsDeadZonePct = 0.05f;
 
-  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
-  {
-    Critical_Error_Handler(VCU_DATA_FAULT);
+  vcuParameters.bseLowPassFilterTimeConstant = 0.00f;
+  vcuParameters.bseImplausibilityTime = 0.100f;
+  vcuParameters.bseVoltageMin = 0.0f;
+  vcuParameters.bseVoltageMax = 3.3f;
+  vcuParameters.bsePressureMin = 0.0f;
+  vcuParameters.bsePressureMax = 1000.0f;
+
+  vcuParameters.stomppMechanicalBrakesThreshold = 100.0f;
+  vcuParameters.stomppAppsCutoffThreshold = 0.25f;
+  vcuParameters.stomppAppsRecoveryThreshold = 0.05f;
+
+  vcuParameters.mapPedalToTorqueRequest = CurveParameter(1.0f, 230.0f);
+  vcuParameters.mapDerateMotorTemp = CurveParameter();
+  vcuParameters.mapDerateInverterTemp = CurveParameter();
+  vcuParameters.mapDerateBatteryTemp = CurveParameter();
+  vcuParameters.mapDerateBatterySoc = CurveParameter();
+
+  vcuParameters.prndlBrakeToStartThreshold = 100.0f;
+  vcuParameters.prndlBuzzerDuration = 2.0f;
+  vcuParameters.prndlSwitchDebounceDuration = 0.100f;
+
+  vcuModel.setParameters(&vcuParameters);
+
+  // left out steering initialization for now
+
+  if(Init_Analog(&hadc1) != 0){
+    Critical_Error_Handler(ADC_DATA_FAULT);
   }
-  //Sets up interrupt for when we receive CAN data
-  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-  {
-    /* Notification Error */
-    Critical_Error_Handler(VCU_DATA_FAULT);
-  }
+
+  HAL_GPIO_WritePin(CAN_TERM_GPIO_Port, CAN_TERM_Pin, GPIO_PIN_SET);
+
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-    uint32_t vcu_input_error = Get_VCU_Inputs(&vcuInput, &vcuParameters, &hadc1, &hfdcan1, &hspi1, &huart3);
-    if(vcu_input_error){
-      HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_14);
-    }
-    if(global_shutdown){
-      vcuInput.inverterReady = false;
-      //GPIO write shutdown signal
-    }
-    else{
-      vcuInput.inverterReady = true;
-    }
-
-    // int cellular_rx_error = Get_CELL_Inputs(&vcuParameters);
-
-    uint32_t delta_time = HAL_GetTick() - last_time_recorded; // in ms
-    last_time_recorded = HAL_GetTick();
-    vcuModel.evaluate(&vcuInput, &vcuOutput,  (float)delta_time / 1000.0f);
-
-    continue;
-
-    uint32_t fault_error = Set_Core_Faults(&vcuOutput);
-    //GPIO write shutdown signal
-
-    int bspd_rx_error = Get_BSPD_Outputs(&bspd);
-
-    uint32_t vcu_output_error = Send_CAN_Output(&vcuOutput, &bspd);
-    if(global_shutdown){
-      //GPIO write
-    }
-
-    int dash_tx_error = Send_DASH_Output(&vcuInput, &vcuOutput, &bspd);
-
-    int tx_error = Send_Out_Results(&vcuInput, &vcuParameters, &vcuOutput, &bspd, last_time_recorded);
-
-    clear_all_faults();
-    HAL_Delay(100);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    Get_Analog(&vcuInput, &vcuParameters);
+    vcuInput.driveSwitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3);
+    vcuInput.inverterReady = true;
+
+    vcuModel.evaluate(&vcuInput, &vcuOutput, 0.003f);
+
+    htim3.Instance->CCR3 = (uint16_t) (vcuOutput.inverterTorqueRequest / 230.0f * 65535.0f);
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) !vcuOutput.prndlState);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) (vcuOutput.faultApps || vcuOutput.faultBse || vcuOutput.faultStompp));
+
+    Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
 
   }
   /* USER CODE END 3 */
@@ -281,7 +305,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfConversion = 5;
+  hadc1.Init.NbrOfConversion = 4;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -304,7 +328,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Channel = ADC_CHANNEL_5;
   sConfig.Rank = ADC_REGULAR_RANK_1;
   sConfig.SamplingTime = ADC_SAMPLETIME_1CYCLE_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
@@ -318,7 +342,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Channel = ADC_CHANNEL_10;
   sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -327,7 +351,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Channel = ADC_CHANNEL_3;
   sConfig.Rank = ADC_REGULAR_RANK_3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -336,17 +360,8 @@ static void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_10;
+  sConfig.Channel = ADC_CHANNEL_8;
   sConfig.Rank = ADC_REGULAR_RANK_4;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure Regular Channel
-  */
-  sConfig.Channel = ADC_CHANNEL_11;
-  sConfig.Rank = ADC_REGULAR_RANK_5;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -391,8 +406,8 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.RxFifo0ElmtsNbr = 1;
   hfdcan1.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_32;
-  hfdcan1.Init.RxFifo1ElmtsNbr = 0;
-  hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_16;
+  hfdcan1.Init.RxFifo1ElmtsNbr = 1;
+  hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_32;
   hfdcan1.Init.RxBuffersNbr = 0;
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.TxEventsNbr = 0;
@@ -455,6 +470,114 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 0;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  __HAL_TIM_DISABLE_OCxPRELOAD(&htim3, TIM_CHANNEL_3);
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart4.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart4.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart4.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart4, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart4, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_DisableFifoMode(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
 
 }
 
@@ -540,9 +663,6 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-  /* DMA1_Stream1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 
 }
 
@@ -568,10 +688,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOE_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(USB_FS_PWR_EN_GPIO_Port, USB_FS_PWR_EN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOF, USB_FS_PWR_EN_Pin|CAN_TERM_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, LD1_Pin|LD3_Pin|GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
@@ -582,31 +702,31 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : USB_FS_PWR_EN_Pin */
-  GPIO_InitStruct.Pin = USB_FS_PWR_EN_Pin;
+  /*Configure GPIO pins : USB_FS_PWR_EN_Pin CAN_TERM_Pin */
+  GPIO_InitStruct.Pin = USB_FS_PWR_EN_Pin|CAN_TERM_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(USB_FS_PWR_EN_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LD1_Pin LD3_Pin PB6 */
-  GPIO_InitStruct.Pin = LD1_Pin|LD3_Pin|GPIO_PIN_6;
+  /*Configure GPIO pins : PA3 USB_FS_VBUS_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|USB_FS_VBUS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : LD3_Pin */
+  GPIO_InitStruct.Pin = LD3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_FS_OVCR_Pin */
   GPIO_InitStruct.Pin = USB_FS_OVCR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(USB_FS_OVCR_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : USB_FS_VBUS_Pin */
-  GPIO_InitStruct.Pin = USB_FS_VBUS_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(USB_FS_VBUS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_FS_ID_Pin */
   GPIO_InitStruct.Pin = USB_FS_ID_Pin;
@@ -648,8 +768,8 @@ void Error_Handler(void)
     /* User can add his own implementation to report the HAL error return state */
     __disable_irq();
     while (1) {
-      HAL_GPIO_WritePin(GPIOB, LD3_Pin, GPIO_PIN_SET);
-      HAL_Delay(500);
+      //Write to Red LED
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
     }
   /* USER CODE END Error_Handler_Debug */
 }

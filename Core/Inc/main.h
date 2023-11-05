@@ -68,6 +68,8 @@ typedef struct {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -89,8 +91,16 @@ void Error_Handler(void);
 #define PH0_MCU_GPIO_Port GPIOH
 #define PH1_MCU_Pin GPIO_PIN_1
 #define PH1_MCU_GPIO_Port GPIOH
-#define LD1_Pin GPIO_PIN_0
-#define LD1_GPIO_Port GPIOB
+#define ADC_BSE2_Pin GPIO_PIN_0
+#define ADC_BSE2_GPIO_Port GPIOC
+#define ADC_BSE1_Pin GPIO_PIN_6
+#define ADC_BSE1_GPIO_Port GPIOA
+#define ADC_APPS1_Pin GPIO_PIN_5
+#define ADC_APPS1_GPIO_Port GPIOC
+#define ADC_APPS2_Pin GPIO_PIN_1
+#define ADC_APPS2_GPIO_Port GPIOB
+#define CAN_TERM_Pin GPIO_PIN_11
+#define CAN_TERM_GPIO_Port GPIOF
 #define LD3_Pin GPIO_PIN_14
 #define LD3_GPIO_Port GPIOB
 #define STLINK_RX_Pin GPIO_PIN_8
