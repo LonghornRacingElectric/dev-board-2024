@@ -29,4 +29,7 @@ static uint8_t WHSData[CAN_DATA_SIZE] = {0};
 static uint8_t IMU2Data[CAN_DATA_SIZE] = {0};
 static uint8_t IMU3Data[CAN_DATA_SIZE] = {0};
 
+float inv_getTorque();
+bool inv_getStatus();
+
 #endif //VCU_FIRMWARE_2024_INTERRUPTHANDLERS_H

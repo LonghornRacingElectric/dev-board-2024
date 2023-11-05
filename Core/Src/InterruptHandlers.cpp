@@ -11,6 +11,18 @@
 
 using namespace std;
 
+
+static bool torqueCommandIn = false;
+static uint8_t torqueCommandData[8] = {0};
+
+float inv_getTorque() {
+    return (float) ((torqueCommandData[0] << 8) | (torqueCommandData[1])) / 10.0f;
+}
+
+bool inv_getStatus() {
+    return torqueCommandIn;
+}
+
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs){
   // Checks if the interrupt is from the correct FIFO
   if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == RESET){
@@ -32,6 +44,10 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
   }
   // Run the code that corresponds to the CAN ID
   switch (Rx0Header.Identifier){
+    case VCU_INV_COMMAND:
+        torqueCommandIn = true;
+        copy(begin(Rx0Data), end(Rx0Data), torqueCommandData);
+      break;
     case VCU_REQUEST_DATA_ID:
       HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
       break;

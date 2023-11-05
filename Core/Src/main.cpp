@@ -32,6 +32,7 @@
 #include "SetCoreFaults.h"
 #include "SendCANOutput.h"
 #include "SendOutResults.h"
+#include "InterruptHandlers.h"
 #include <cstdio>
 /* USER CODE END Includes */
 
@@ -87,10 +88,10 @@ static void MX_TIM3_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-VcuModel vcuModel;
-VcuParameters vcuParameters;
-VcuInput vcuInput;
-VcuOutput vcuOutput;
+//VcuModel vcuModel;
+//VcuParameters vcuParameters;
+//VcuInput vcuInput;
+//VcuOutput vcuOutput;
 /* USER CODE END 0 */
 
 /**
@@ -142,48 +143,48 @@ int main(void)
 //
 //  BSPD bspd = {0, 0, 0, 0, 0};
 //
-//  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
-//  {
-//    Critical_Error_Handler(VCU_DATA_FAULT);
-//  }
-//  //Sets up interrupt for when we receive CAN data
-//  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-//  {
-//    /* Notification Error */
-//    Critical_Error_Handler(VCU_DATA_FAULT);
-//  }
+  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
+  {
+    Critical_Error_Handler(VCU_DATA_FAULT);
+  }
+  //Sets up interrupt for when we receive CAN data
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+  {
+    /* Notification Error */
+    Critical_Error_Handler(VCU_DATA_FAULT);
+  }
 
-  vcuParameters.appsLowPassFilterTimeConstant = 0.000f;
-  vcuParameters.appsImplausibilityTime = 0.100f;
-  vcuParameters.appsPlausibilityRange = 0.10f;
-  vcuParameters.apps1VoltageMin = 0.0f;
-  vcuParameters.apps1VoltageMax = 3.3f;
-  vcuParameters.apps2VoltageMin = 0.0f;
-  vcuParameters.apps2VoltageMax = 3.3f;
-  vcuParameters.appsDeadZonePct = 0.05f;
-
-  vcuParameters.bseLowPassFilterTimeConstant = 0.00f;
-  vcuParameters.bseImplausibilityTime = 0.100f;
-  vcuParameters.bseVoltageMin = 0.0f;
-  vcuParameters.bseVoltageMax = 3.3f;
-  vcuParameters.bsePressureMin = 0.0f;
-  vcuParameters.bsePressureMax = 1000.0f;
-
-  vcuParameters.stomppMechanicalBrakesThreshold = 100.0f;
-  vcuParameters.stomppAppsCutoffThreshold = 0.25f;
-  vcuParameters.stomppAppsRecoveryThreshold = 0.05f;
-
-  vcuParameters.mapPedalToTorqueRequest = CurveParameter(1.0f, 230.0f);
-  vcuParameters.mapDerateMotorTemp = CurveParameter();
-  vcuParameters.mapDerateInverterTemp = CurveParameter();
-  vcuParameters.mapDerateBatteryTemp = CurveParameter();
-  vcuParameters.mapDerateBatterySoc = CurveParameter();
-
-  vcuParameters.prndlBrakeToStartThreshold = 100.0f;
-  vcuParameters.prndlBuzzerDuration = 2.0f;
-  vcuParameters.prndlSwitchDebounceDuration = 0.100f;
-
-  vcuModel.setParameters(&vcuParameters);
+//  vcuParameters.appsLowPassFilterTimeConstant = 0.000f;
+//  vcuParameters.appsImplausibilityTime = 0.100f;
+//  vcuParameters.appsPlausibilityRange = 0.10f;
+//  vcuParameters.apps1VoltageMin = 0.0f;
+//  vcuParameters.apps1VoltageMax = 3.3f;
+//  vcuParameters.apps2VoltageMin = 0.0f;
+//  vcuParameters.apps2VoltageMax = 3.3f;
+//  vcuParameters.appsDeadZonePct = 0.05f;
+//
+//  vcuParameters.bseLowPassFilterTimeConstant = 0.00f;
+//  vcuParameters.bseImplausibilityTime = 0.100f;
+//  vcuParameters.bseVoltageMin = 0.0f;
+//  vcuParameters.bseVoltageMax = 3.3f;
+//  vcuParameters.bsePressureMin = 0.0f;
+//  vcuParameters.bsePressureMax = 1000.0f;
+//
+//  vcuParameters.stomppMechanicalBrakesThreshold = 100.0f;
+//  vcuParameters.stomppAppsCutoffThreshold = 0.25f;
+//  vcuParameters.stomppAppsRecoveryThreshold = 0.05f;
+//
+//  vcuParameters.mapPedalToTorqueRequest = CurveParameter(1.0f, 230.0f);
+//  vcuParameters.mapDerateMotorTemp = CurveParameter();
+//  vcuParameters.mapDerateInverterTemp = CurveParameter();
+//  vcuParameters.mapDerateBatteryTemp = CurveParameter();
+//  vcuParameters.mapDerateBatterySoc = CurveParameter();
+//
+//  vcuParameters.prndlBrakeToStartThreshold = 100.0f;
+//  vcuParameters.prndlBuzzerDuration = 2.0f;
+//  vcuParameters.prndlSwitchDebounceDuration = 0.100f;
+//
+//  vcuModel.setParameters(&vcuParameters);
 
   // left out steering initialization for now
 
@@ -203,17 +204,20 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    Get_Analog(&vcuInput, &vcuParameters);
-    vcuInput.driveSwitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3);
-    vcuInput.inverterReady = true;
+//    Get_Analog(&vcuInput, &vcuParameters);
+//    vcuInput.driveSwitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3);
+//    vcuInput.inverterReady = true;
+//
+//    vcuModel.evaluate(&vcuInput, &vcuOutput, 0.003f);
 
-    vcuModel.evaluate(&vcuInput, &vcuOutput, 0.003f);
+    float torqueCommand = inv_getTorque();
+    bool torqueCommandIn = inv_getStatus();
 
-    htim3.Instance->CCR3 = (uint16_t) (vcuOutput.inverterTorqueRequest / 230.0f * 65535.0f);
-    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) !vcuOutput.prndlState);
-    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) (vcuOutput.faultApps || vcuOutput.faultBse || vcuOutput.faultStompp));
-
-    Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
+    htim3.Instance->CCR3 = (uint16_t) (torqueCommand / 230.0f * 65535.0f);
+    HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) torqueCommandIn);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) true);
+//
+//    Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
 
   }
   /* USER CODE END 3 */
@@ -425,13 +429,13 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
   hfdcan1.Init.NominalPrescaler = 4;
-  hfdcan1.Init.NominalSyncJumpWidth = 1;
+  hfdcan1.Init.NominalSyncJumpWidth = 3;
   hfdcan1.Init.NominalTimeSeg1 = 28;
   hfdcan1.Init.NominalTimeSeg2 = 3;
   hfdcan1.Init.DataPrescaler = 1;
-  hfdcan1.Init.DataSyncJumpWidth = 1;
-  hfdcan1.Init.DataTimeSeg1 = 1;
-  hfdcan1.Init.DataTimeSeg2 = 1;
+  hfdcan1.Init.DataSyncJumpWidth = 3;
+  hfdcan1.Init.DataTimeSeg1 = 28;
+  hfdcan1.Init.DataTimeSeg2 = 3;
   hfdcan1.Init.MessageRAMOffset = 0;
   hfdcan1.Init.StdFiltersNbr = 1;
   hfdcan1.Init.ExtFiltersNbr = 0;
@@ -439,7 +443,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.RxFifo1ElmtsNbr = 0;
   hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_8;
-  hfdcan1.Init.RxBuffersNbr = 0;
+  hfdcan1.Init.RxBuffersNbr = 32;
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.TxEventsNbr = 0;
   hfdcan1.Init.TxBuffersNbr = 0;
@@ -451,7 +455,14 @@ static void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
-
+  FDCAN_FilterTypeDef sFilterConfig;
+  sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  sFilterConfig.FilterIndex = 0;
+  sFilterConfig.FilterType = FDCAN_FILTER_RANGE;
+  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  sFilterConfig.FilterID1 = 0x0;
+  sFilterConfig.FilterID2 = 0x7FF;
+  HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig);
   /* USER CODE END FDCAN1_Init 2 */
 
 }
@@ -800,7 +811,10 @@ void Error_Handler(void)
     __disable_irq();
     while (1) {
       //Write to Red LED
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) false);
+        for(volatile int i = 0; i < 10000000; i++);
+        HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) true);
+        for(volatile int i = 0; i < 10000000; i++);
     }
   /* USER CODE END Error_Handler_Debug */
 }
