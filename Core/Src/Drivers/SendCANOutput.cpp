@@ -21,7 +21,7 @@ using namespace std;
 uint32_t Send_CAN_Output(VcuInput* input, VcuOutput* output, VcuParameters* params, BSPD* bspd, FDCAN_HandleTypeDef* hfdcan) {
 
   //Send out Torque Command
-  auto torqueCommand = (int16_t) output->inverterTorqueRequest;
+  auto torqueCommand = (int16_t) (output->inverterTorqueRequest * 10.0f);
   CAN_OUT_TxData[0] = (int8_t) (torqueCommand >> 8);
   CAN_OUT_TxData[1] = (int8_t) (torqueCommand & 0x0FF);
   CAN_OUT_TxData[4] = 1;
