@@ -142,16 +142,16 @@ int main(void)
 //
 //  BSPD bspd = {0, 0, 0, 0, 0};
 //
-//  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
-//  {
-//    Critical_Error_Handler(VCU_DATA_FAULT);
-//  }
-//  //Sets up interrupt for when we receive CAN data
-//  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-//  {
-//    /* Notification Error */
-//    Critical_Error_Handler(VCU_DATA_FAULT);
-//  }
+  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
+  {
+    Critical_Error_Handler(VCU_DATA_FAULT);
+  }
+  //Sets up interrupt for when we receive CAN data
+  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
+  {
+    /* Notification Error */
+    Critical_Error_Handler(VCU_DATA_FAULT);
+  }
 
   vcuParameters.appsLowPassFilterTimeConstant = 0.000f;
   vcuParameters.appsImplausibilityTime = 0.100f;
@@ -213,7 +213,10 @@ int main(void)
     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) !vcuOutput.prndlState);
     HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) (vcuOutput.faultApps || vcuOutput.faultBse || vcuOutput.faultStompp));
 
-    Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
+    unsigned int CAN_error = Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
+    clear_all_faults();
+
+    HAL_Delay(3);
 
   }
   /* USER CODE END 3 */
@@ -451,6 +454,14 @@ static void MX_FDCAN1_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
+  FDCAN_FilterTypeDef sFilterConfig;
+  sFilterConfig.IdType = FDCAN_STANDARD_ID;
+  sFilterConfig.FilterIndex = 0;
+  sFilterConfig.FilterType = FDCAN_FILTER_RANGE;
+  sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
+  sFilterConfig.FilterID1 = 0x0;
+  sFilterConfig.FilterID2 = 0x7FF;
+  HAL_FDCAN_ConfigFilter(&hfdcan1, &sFilterConfig);
 
   /* USER CODE END FDCAN1_Init 2 */
 

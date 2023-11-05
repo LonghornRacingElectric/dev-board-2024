@@ -46,22 +46,22 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       copy(begin(Rx0Data), end(Rx0Data), INVTemp3Data);
       break;
     case INV_MOTOR_POSITIONS:
-      motorInfo.motorAngle = ((Rx0Data[0] << 8) + Rx0Data[1]) * 10;
-      motorInfo.motorVelocity = ((Rx0Data[2] << 8) + Rx0Data[3]);
-      inverterInfo.inverterFrequency = ((Rx0Data[4] << 8) + Rx0Data[5]) * 10;
-      motorInfo.resolverAngle = ((Rx0Data[6] << 8) + Rx0Data[7]) * 10;
+      motorInfo.motorAngle = ((Rx0Data[1] << 8) + Rx0Data[0]) * 10;
+      motorInfo.motorVelocity = ((Rx0Data[3] << 8) + Rx0Data[2]);
+      inverterInfo.inverterFrequency = ((Rx0Data[5] << 8) + Rx0Data[4]) * 10;
+      motorInfo.resolverAngle = ((Rx0Data[7] << 8) + Rx0Data[6]) * 10;
       break;
     case INV_CURRENT:
-      inverterInfo.phaseACurrent = ((Rx0Data[0] << 8) + Rx0Data[1]) * 10;
-      inverterInfo.phaseBCurrent = ((Rx0Data[2] << 8) + Rx0Data[3]) * 10;
-      inverterInfo.phaseCCurrent = ((Rx0Data[4] << 8) + Rx0Data[5]) * 10;
-      inverterInfo.busCurrent = ((Rx0Data[6] << 8) + Rx0Data[7]) * 10;
+      inverterInfo.phaseACurrent = ((Rx0Data[1] << 8) + Rx0Data[0]) * 10;
+      inverterInfo.phaseBCurrent = ((Rx0Data[3] << 8) + Rx0Data[2]) * 10;
+      inverterInfo.phaseCCurrent = ((Rx0Data[5] << 8) + Rx0Data[4]) * 10;
+      inverterInfo.busCurrent = ((Rx0Data[7] << 8) + Rx0Data[6]) * 10;
       break;
     case INV_VOLTAGE:
-      inverterInfo.busVoltage = ((Rx0Data[0] << 8) + Rx0Data[1]) * 10;
-      inverterInfo.outputVoltage = ((Rx0Data[2] << 8) + Rx0Data[3]) * 10;
-      inverterInfo.ABVoltage = ((Rx0Data[4] << 8) + Rx0Data[5]) * 10;
-      inverterInfo.BCVoltage = ((Rx0Data[6] << 8) + Rx0Data[7]) * 10;
+      inverterInfo.busVoltage = ((Rx0Data[1] << 8) + Rx0Data[0]) * 10;
+      inverterInfo.outputVoltage = ((Rx0Data[3] << 8) + Rx0Data[2]) * 10;
+      inverterInfo.ABVoltage = ((Rx0Data[5] << 8) + Rx0Data[4]) * 10;
+      inverterInfo.BCVoltage = ((Rx0Data[7] << 8) + Rx0Data[6]) * 10;
       break;
     case INV_STATE_CODES:
       copy(begin(Rx0Data), end(Rx0Data), INVStateData);
@@ -70,8 +70,8 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
       copy(begin(Rx0Data), end(Rx0Data), INVFaultData);
       break;
     case INV_TORQUE_TIMER:
-      inverterInfo.torqueCommand = ((Rx0Data[0] << 8) + Rx0Data[1]) * 10;
-      inverterInfo.torqueFeedback = ((Rx0Data[2] << 8) + Rx0Data[3]) * 10;
+      inverterInfo.torqueCommand = ((Rx0Data[1] << 8) + Rx0Data[0]) * 10;
+      inverterInfo.torqueFeedback = ((Rx0Data[3] << 8) + Rx0Data[2]) * 10;
       break;
     case INV_HIGH_SPEED_MSG:
       inverterInfo.torqueCommand = ((Rx0Data[0] << 8) + Rx0Data[1]) * 10;
