@@ -7,14 +7,14 @@
 
 #include <cstdint>
 
-static uint32_t vcu_fault_vector = 0x0;
+extern uint32_t vcu_fault_vector; //will be sent by VCU and updated occasionally
 
-static uint64_t inv_fault_vector = 0x0; //will be sent by Inverter and updated occasionally
-static uint64_t inv_state_vector = 0x0; //will be sent by Inverter and updated occasionally
+extern uint64_t inv_fault_vector; //will be sent by Inverter and updated occasionally
+extern uint64_t inv_state_vector; //will be sent by Inverter and updated occasionally
 
-static uint32_t hvc_fault_vector = 0x0; //will be sent by HVC and updated occasionally
+extern uint32_t hvc_fault_vector; //will be sent by HVC and updated occasionally
 
-static uint32_t pdu_fault_vector = 0x0; //will be sent by PDU and updated occasionally
+extern uint32_t pdu_fault_vector; //will be sent by PDU and updated occasionally
 
 //Core Faults which are derived from VCU CORE Outputs, see Libs/VcuCore/src/VcuModel.h
 #define APPS_FAULT 0x00000001
@@ -43,11 +43,10 @@ static uint32_t pdu_fault_vector = 0x0; //will be sent by PDU and updated occasi
 #define GENERIC_CAN_DATA_FAULT 0x80000000
 #define VCU_DATA_FAULT 0x40000000
 
-#define set_fault(fault) vcu_fault_vector |= fault
-#define clear_fault(fault) vcu_fault_vector &= ~fault
-#define clear_all_faults() vcu_fault_vector = 0x0
-
 #define VCU_FAULT_LIST vcu_fault_vector
+void set_fault(uint32_t fault);
+void clear_fault(uint32_t fault);
+void clear_all_faults();
 
 
 

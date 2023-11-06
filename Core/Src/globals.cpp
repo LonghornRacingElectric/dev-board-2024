@@ -5,6 +5,11 @@
 #include "globals.h"
 #include "firmware_faults.h"
 
+motor_info_t motorInfo = {0};
+inverter_info_t inverterInfo = {0};
+inv_params_t can_response = {0};
+inv_params_t torque_limit_response = {0};
+
 int Critical_Error_Handler(uint32_t fault_type){
   global_shutdown = 1;
   set_fault(fault_type);

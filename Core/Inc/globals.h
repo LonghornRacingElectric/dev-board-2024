@@ -73,7 +73,15 @@ typedef struct InverterInfo {
 
 } inverter_info_t;
 
-static motor_info_t motorInfo;
-static inverter_info_t inverterInfo;
+typedef struct inv_params {
+  uint16_t param_addr;
+  bool write_success;
+  int16_t param_value;
+} inv_params_t;
+
+extern motor_info_t motorInfo;
+extern inverter_info_t inverterInfo;
+extern inv_params_t can_response;
+extern inv_params_t torque_limit_response;
 
 #endif //VCU_FIRMWARE_2024_GLOBALS_H

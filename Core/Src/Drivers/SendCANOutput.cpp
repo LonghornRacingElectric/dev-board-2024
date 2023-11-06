@@ -14,22 +14,23 @@ FDCAN_TxHeaderTypeDef CAN_OUT_TxHeader;
 #define VCU_DASH_CAR_INFO 0x204 //Sends out typical dash information (e.g. speed, acceleration, SoC, etc...) to dash
 
 
-int8_t CAN_OUT_TxData[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+uint8_t CAN_OUT_TxData[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 uint8_t DASHCAN_OUT_TxData[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 using namespace std;
 
 uint32_t Send_CAN_Output(VcuInput* input, VcuOutput* output, VcuParameters* params, BSPD* bspd, FDCAN_HandleTypeDef* hfdcan) {
 
   //Send out Torque Command
-  auto torqueCommand = (int16_t) (output->inverterTorqueRequest * 10.0f);
-  CAN_OUT_TxData[0] = (int8_t) (torqueCommand & 0xFF);
-  CAN_OUT_TxData[1] = (int8_t) (torqueCommand >> 8);
-  CAN_OUT_TxData[4] = 1;
-  CAN_OUT_TxData[5] = 0x01; //Maybe change this to depend on global_shutdown and inverterReady
+  auto torqueCommand = (uint16_t) (output->inverterTorqueRequest * 10.0f);
+  CAN_OUT_TxData[0] = (uint8_t) (torqueCommand & 0xFF);
+  CAN_OUT_TxData[1] = (uint8_t) (torqueCommand >> 8);
+  CAN_OUT_TxData[4] = 0; // forward
+  CAN_OUT_TxData[5] = (uint8_t) output->enableInverter;
 
   init_TX(&CAN_OUT_TxHeader, VCU_INV_COMMAND);
-  if(HAL_FDCAN_AddMessageToTxFifoQ(hfdcan, &CAN_OUT_TxHeader, reinterpret_cast<uint8_t *>(CAN_OUT_TxData)) != HAL_OK){
-    return Critical_Error_Handler(TORQUEREQUEST_DATA_FAULT);
+  if(HAL_FDCAN_AddMessageToTxFifoQ(hfdcan, &CAN_OUT_TxHeader, CAN_OUT_TxData) != HAL_OK){
+    Critical_Error_Handler(TORQUEREQUEST_DATA_FAULT);
+    return hfdcan->ErrorCode;
   }
 //
 //  CAN_OUT_TxData[0] = output->r2dBuzzer;
@@ -73,5 +74,23 @@ uint32_t Send_CAN_Output(VcuInput* input, VcuOutput* output, VcuParameters* para
 //  if(HAL_FDCAN_AddMessageToTxFifoQ(hfdcan, &CAN_OUT_TxHeader, reinterpret_cast<uint8_t *>(DASHCAN_OUT_TxData)) != HAL_OK){
 //    return Critical_Error_Handler(DASH_DATA_FAULT);
 //  }
+  return 0;
+}
+
+uint32_t Update_CAN_Parameters(uint16_t param_addr, uint32_t param_value, FDCAN_HandleTypeDef* hfdcan, bool write){
+  CAN_OUT_TxData[0] = (uint8_t) param_addr;
+  CAN_OUT_TxData[1] = (uint8_t) (param_addr >> 8);
+  CAN_OUT_TxData[2] = (uint8_t) write;
+  CAN_OUT_TxData[4] = (uint8_t) param_value;
+  CAN_OUT_TxData[5] = (uint8_t) (param_value >> 8);
+  if((param_value >> 16) != 0) {
+    CAN_OUT_TxData[6] = (uint8_t) (param_value >> 16);
+    CAN_OUT_TxData[7] = (uint8_t) (param_value >> 24);
+  }
+
+  init_TX(&CAN_OUT_TxHeader, VCU_INV_PARAMETER_RW);
+  if(HAL_FDCAN_AddMessageToTxFifoQ(hfdcan, &CAN_OUT_TxHeader, CAN_OUT_TxData) != HAL_OK){
+    return Critical_Error_Handler(INVERTER_DATA_FAULT);
+  }
   return 0;
 }

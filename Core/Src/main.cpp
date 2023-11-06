@@ -25,6 +25,7 @@
 #include "library.h"
 #include "analog.h"
 #include "gps.h"
+#include "inv.h"
 #include "firmware_faults.h"
 #include "GetTelemetry.h"
 #include "GetCELLInputs.h"
@@ -33,6 +34,9 @@
 #include "SendCANOutput.h"
 #include "SendOutResults.h"
 #include <cstdio>
+#include <vector>
+#include <string>
+using namespace std;
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -192,8 +196,24 @@ int main(void)
   }
 
   HAL_GPIO_WritePin(CAN_TERM_GPIO_Port, CAN_TERM_Pin, GPIO_PIN_SET);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
-    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
+  /* This will write to update CAN Inverter to 1 Mbit/s */
+  // Update_CAN_Parameters(147, 1000, &hfdcan1, true);
+
+  /* This will write to update Torque Limit to whatever value (in this case 120 Nm) */
+  // uint16_t torque_limit = 120;
+  // Update_CAN_Parameters(168, torque_limit * 10, &hfdcan1, true);
+
+  /* This will clear any inverter faults */
+  // Update_CAN_Parameters(20,0, &hfdcan1, true);
+
+  /* This will selectively disable any broadcasts from the inverter */
+//  uint32_t fault_enable_vector = 0xFFFF3CE5;
+//  Update_CAN_Parameters(148, fault_enable_vector, &hfdcan1, true);
+
+  vector<string> fault_strings(64);
+  string inverter_state, vsm_state;
 
   /* USER CODE END 2 */
 
@@ -204,6 +224,8 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     Get_Analog(&vcuInput, &vcuParameters);
+    update_INV(&vcuInput, &hfdcan1);
+    Interpret_INV_Fault(fault_strings);
     vcuInput.driveSwitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3);
     vcuInput.inverterReady = true;
 
@@ -214,7 +236,11 @@ int main(void)
     HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) (vcuOutput.faultApps || vcuOutput.faultBse || vcuOutput.faultStompp));
 
     unsigned int CAN_error = Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
+    if(CAN_error > 0){
+      Critical_Error_Handler(VCU_DATA_FAULT);
+    }
     clear_all_faults();
+    fault_strings.clear();
 
     HAL_Delay(3);
 
@@ -423,11 +449,11 @@ static void MX_FDCAN1_Init(void)
   /* USER CODE END FDCAN1_Init 1 */
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
-  hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
+  hfdcan1.Init.Mode = FDCAN_MODE_EXTERNAL_LOOPBACK;
   hfdcan1.Init.AutoRetransmission = ENABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 4;
+  hfdcan1.Init.NominalPrescaler = 2;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
   hfdcan1.Init.NominalTimeSeg1 = 28;
   hfdcan1.Init.NominalTimeSeg2 = 3;
@@ -446,9 +472,9 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.TxEventsNbr = 0;
   hfdcan1.Init.TxBuffersNbr = 0;
-  hfdcan1.Init.TxFifoQueueElmtsNbr = 1;
+  hfdcan1.Init.TxFifoQueueElmtsNbr = 32;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
-  hfdcan1.Init.TxElmtSize = FDCAN_DATA_BYTES_32;
+  hfdcan1.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
   {
     Error_Handler();
