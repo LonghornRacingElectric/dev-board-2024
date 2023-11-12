@@ -12,15 +12,15 @@
 using namespace std;
 
 
-static bool torqueCommandIn = false;
-static uint8_t torqueCommandData[8] = {0};
-
-float inv_getTorque() {
-    return (float) ((torqueCommandData[0] << 8) | (torqueCommandData[1])) / 10.0f;
-}
+static bool inverterAlive = false;
+//static uint8_t torqueCommandData[8] = {0};
+//
+//float inv_getTorque() {
+//    return (float) ((torqueCommandData[0]) | (torqueCommandData[1] << 8)) / 10.0f;
+//}
 
 bool inv_getStatus() {
-    return torqueCommandIn;
+    return inverterAlive;
 }
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs){
@@ -43,11 +43,11 @@ void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
     return;
   }
   // Run the code that corresponds to the CAN ID
+    inverterAlive = true;
   switch (Rx0Header.Identifier){
-    case VCU_INV_COMMAND:
-        torqueCommandIn = true;
-        copy(begin(Rx0Data), end(Rx0Data), torqueCommandData);
-      break;
+//    case VCU_INV_COMMAND:
+//        copy(begin(Rx0Data), end(Rx0Data), torqueCommandData);
+//      break;
     case VCU_REQUEST_DATA_ID:
       HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
       break;

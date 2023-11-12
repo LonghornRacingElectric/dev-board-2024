@@ -136,10 +136,10 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
 //  volatile uint32_t last_time_recorded = 0;
-//  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
-//  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-//  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
-//  HAL_NVIC_EnableIRQ(SysTick_IRQn);
+  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(SysTick_IRQn);
 //
 //  BSPD bspd = {0, 0, 0, 0, 0};
 //
@@ -210,10 +210,10 @@ int main(void)
 //
 //    vcuModel.evaluate(&vcuInput, &vcuOutput, 0.003f);
 
-    float torqueCommand = inv_getTorque();
+//    float torqueCommand = inv_getTorque();
     bool torqueCommandIn = inv_getStatus();
 
-    htim3.Instance->CCR3 = (uint16_t) (torqueCommand / 230.0f * 65535.0f);
+//    htim3.Instance->CCR3 = (uint16_t) (torqueCommand / 230.0f * 65535.0f);
     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) torqueCommandIn);
     HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) true);
 //
