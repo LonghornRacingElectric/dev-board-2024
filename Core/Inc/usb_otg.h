@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    fdcan.h
+  * @file    usb_otg.h
   * @brief   This file contains all the function prototypes for
-  *          the fdcan.c file
+  *          the usb_otg.c file
   ******************************************************************************
   * @attention
   *
@@ -18,8 +18,8 @@
   */
 /* USER CODE END Header */
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __FDCAN_H__
-#define __FDCAN_H__
+#ifndef __USB_OTG_H__
+#define __USB_OTG_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,13 +32,11 @@ extern "C" {
 
 /* USER CODE END Includes */
 
-extern FDCAN_HandleTypeDef hfdcan2;
-
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
 
-void MX_FDCAN2_Init(void);
+void MX_USB_OTG_HS_USB_Init(void);
 
 /* USER CODE BEGIN Prototypes */
 
@@ -48,5 +46,5 @@ void MX_FDCAN2_Init(void);
 }
 #endif
 
-#endif /* __FDCAN_H__ */
+#endif /* __USB_OTG_H__ */
 

@@ -1,9 +1,9 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
-  * @file    fdcan.h
-  * @brief   This file contains all the function prototypes for
-  *          the fdcan.c file
+  * @file    usb_otg.c
+  * @brief   This file provides code for the configuration
+  *          of the USB_OTG instances.
   ******************************************************************************
   * @attention
   *
@@ -17,36 +17,31 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-/* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __FDCAN_H__
-#define __FDCAN_H__
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* Includes ------------------------------------------------------------------*/
-#include "main.h"
+#include "usb_otg.h"
 
-/* USER CODE BEGIN Includes */
+/* USER CODE BEGIN 0 */
 
-/* USER CODE END Includes */
+/* USER CODE END 0 */
 
-extern FDCAN_HandleTypeDef hfdcan2;
+/* USB_OTG_HS init function */
 
-/* USER CODE BEGIN Private defines */
+void MX_USB_OTG_HS_USB_Init(void)
+{
 
-/* USER CODE END Private defines */
+  /* USER CODE BEGIN USB_OTG_HS_Init 0 */
 
-void MX_FDCAN2_Init(void);
+  /* USER CODE END USB_OTG_HS_Init 0 */
 
-/* USER CODE BEGIN Prototypes */
+  /* USER CODE BEGIN USB_OTG_HS_Init 1 */
 
-/* USER CODE END Prototypes */
+  /* USER CODE END USB_OTG_HS_Init 1 */
+  /* USER CODE BEGIN USB_OTG_HS_Init 2 */
 
-#ifdef __cplusplus
+  /* USER CODE END USB_OTG_HS_Init 2 */
+
 }
-#endif
 
-#endif /* __FDCAN_H__ */
+/* USER CODE BEGIN 1 */
 
+/* USER CODE END 1 */
