@@ -22,18 +22,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "VcuModel.h"
-#include "library.h"
 #include "analog.h"
-#include "gps.h"
 #include "inv.h"
-#include "firmware_faults.h"
-#include "GetTelemetry.h"
-#include "GetCELLInputs.h"
-#include "GetBSPDOutputs.h"
-#include "SetCoreFaults.h"
-#include "SendCANOutput.h"
-#include "SendOutResults.h"
-#include <cstdio>
+#include "faults.h"
+#include "can.h"
+#include <cmath>
 #include <vector>
 #include <string>
 using namespace std;
@@ -146,16 +139,6 @@ int main(void)
 //
 //  BSPD bspd = {0, 0, 0, 0, 0};
 //
-  if(HAL_FDCAN_Start(&hfdcan1)!= HAL_OK)
-  {
-    Critical_Error_Handler(VCU_DATA_FAULT);
-  }
-  //Sets up interrupt for when we receive CAN data
-  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) != HAL_OK)
-  {
-    /* Notification Error */
-    Critical_Error_Handler(VCU_DATA_FAULT);
-  }
 
   vcuParameters.appsLowPassFilterTimeConstant = 0.000f;
   vcuParameters.appsImplausibilityTime = 0.100f;
@@ -192,8 +175,14 @@ int main(void)
   // left out steering initialization for now
 
   if(Init_Analog(&hadc1) != 0){
-    Critical_Error_Handler(ADC_DATA_FAULT);
+      vcu_fault_vector |= FAULT_VCU_ADC;
+      HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
   }
+  if(can_init(&hfdcan1) != HAL_OK){
+      vcu_fault_vector |= FAULT_VCU_CAN;
+      HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
+  }
+  inverter_init();
 
   HAL_GPIO_WritePin(CAN_TERM_GPIO_Port, CAN_TERM_Pin, GPIO_PIN_SET);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
@@ -214,6 +203,7 @@ int main(void)
 
   vector<string> fault_strings(64);
   string inverter_state, vsm_state;
+  InverterStatus status;
 
   /* USER CODE END 2 */
 
@@ -224,8 +214,6 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     Get_Analog(&vcuInput, &vcuParameters);
-    update_INV(&vcuInput, &hfdcan1);
-    Interpret_INV_Fault(fault_strings);
     vcuInput.driveSwitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3);
     vcuInput.inverterReady = true;
 
@@ -235,12 +223,35 @@ int main(void)
     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) !vcuOutput.prndlState);
     HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) (vcuOutput.faultApps || vcuOutput.faultBse || vcuOutput.faultStompp));
 
-    unsigned int CAN_error = Send_CAN_Output(&vcuInput, &vcuOutput, &vcuParameters, nullptr, &hfdcan1);
+    unsigned int CAN_error = inverter_sendTorqueCommand(vcuOutput.inverterTorqueRequest, 0, vcuInput.inverterReady);
     if(CAN_error > 0){
-      Critical_Error_Handler(VCU_DATA_FAULT);
+      vcu_fault_vector |= FAULT_VCU_INV;
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
     }
-    clear_all_faults();
+    else{
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+    }
+
+    CAN_error = can_processRxFifo();
+    if(CAN_error > 0){
+      vcu_fault_vector |= FAULT_VCU_CAN;
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+    }
+    else{
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+    }
+    float test_torque_command = inverter_getStatus(&status);
+
+    if(abs(test_torque_command - vcuOutput.inverterTorqueRequest) <= 0.1f){
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
+    }
+    else{
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+    }
+
+    vcu_fault_vector = 0;
     fault_strings.clear();
+    can_clearMailboxes();
 
     HAL_Delay(3);
 
@@ -453,10 +464,10 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.AutoRetransmission = ENABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 2;
+  hfdcan1.Init.NominalPrescaler = 4;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
-  hfdcan1.Init.NominalTimeSeg1 = 28;
-  hfdcan1.Init.NominalTimeSeg2 = 3;
+  hfdcan1.Init.NominalTimeSeg1 = 13;
+  hfdcan1.Init.NominalTimeSeg2 = 2;
   hfdcan1.Init.DataPrescaler = 1;
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
@@ -464,7 +475,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.MessageRAMOffset = 0;
   hfdcan1.Init.StdFiltersNbr = 1;
   hfdcan1.Init.ExtFiltersNbr = 0;
-  hfdcan1.Init.RxFifo0ElmtsNbr = 32;
+  hfdcan1.Init.RxFifo0ElmtsNbr = 64;
   hfdcan1.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
   hfdcan1.Init.RxFifo1ElmtsNbr = 0;
   hfdcan1.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_8;
@@ -759,7 +770,13 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOF, USB_FS_PWR_EN_Pin|CAN_TERM_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, can_send_success_Pin|LD3_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, same_torque_req_Pin|can_receive_success_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(Software_Error_GPIO_Port, Software_Error_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
@@ -783,12 +800,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : LD3_Pin */
-  GPIO_InitStruct.Pin = LD3_Pin;
+  /*Configure GPIO pins : can_send_success_Pin LD3_Pin */
+  GPIO_InitStruct.Pin = can_send_success_Pin|LD3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : same_torque_req_Pin can_receive_success_Pin */
+  GPIO_InitStruct.Pin = same_torque_req_Pin|can_receive_success_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : Software_Error_Pin */
+  GPIO_InitStruct.Pin = Software_Error_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(Software_Error_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : USB_FS_OVCR_Pin */
   GPIO_InitStruct.Pin = USB_FS_OVCR_Pin;
