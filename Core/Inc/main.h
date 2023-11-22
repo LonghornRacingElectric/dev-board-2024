@@ -35,31 +35,11 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-#define NUM_STATES 14
-typedef enum {
-  VCU_INPUT,
-  VCU_CORE_REQ_TORQUE,
-  VCU_CORE_NO_REQ_TORQUE,
-  VCU_INPUT_FAULT_HANDLER,
-  VCU_CORE_FAULT_HANDLER,
-  BSPD_INPUT,
-  CAN_OUTPUT_BACKCAR,
-  CAN_OUTPUT_FAULT_HANDLER,
-  RTD_BUZZER,
-  CAN_OUTPUT_DASH,
-  CELL_OUTPUT,
-  SDCARD_OUTPUT,
-
-} State;
 
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-typedef struct {
-  State currentState;
-  State nextStates[NUM_STATES]; // Array of state functions
-} FSM;
 
 /* USER CODE END EC */
 
@@ -67,8 +47,6 @@ typedef struct {
 /* USER CODE BEGIN EM */
 
 /* USER CODE END EM */
-
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
@@ -99,6 +77,8 @@ void Error_Handler(void);
 #define ADC_APPS1_GPIO_Port GPIOC
 #define ADC_APPS2_Pin GPIO_PIN_1
 #define ADC_APPS2_GPIO_Port GPIOB
+#define can_send_success_Pin GPIO_PIN_2
+#define can_send_success_GPIO_Port GPIOB
 #define CAN_TERM_Pin GPIO_PIN_11
 #define CAN_TERM_GPIO_Port GPIOF
 #define LD3_Pin GPIO_PIN_14
@@ -107,6 +87,12 @@ void Error_Handler(void);
 #define STLINK_RX_GPIO_Port GPIOD
 #define STLINK_TX_Pin GPIO_PIN_9
 #define STLINK_TX_GPIO_Port GPIOD
+#define same_torque_req_Pin GPIO_PIN_12
+#define same_torque_req_GPIO_Port GPIOD
+#define can_receive_success_Pin GPIO_PIN_13
+#define can_receive_success_GPIO_Port GPIOD
+#define Software_Error_Pin GPIO_PIN_6
+#define Software_Error_GPIO_Port GPIOG
 #define USB_FS_OVCR_Pin GPIO_PIN_7
 #define USB_FS_OVCR_GPIO_Port GPIOG
 #define USB_FS_VBUS_Pin GPIO_PIN_9

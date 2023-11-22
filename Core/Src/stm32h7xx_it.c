@@ -56,9 +56,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern DMA_HandleTypeDef hdma_adc1;
-extern FDCAN_HandleTypeDef hfdcan1;
-extern SPI_HandleTypeDef hspi1;
-extern UART_HandleTypeDef huart4;
+extern DMA_HandleTypeDef hdma_usart3_rx;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -218,59 +216,17 @@ void DMA1_Stream0_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles FDCAN1 interrupt 0.
+  * @brief This function handles DMA1 stream1 global interrupt.
   */
-void FDCAN1_IT0_IRQHandler(void)
+void DMA1_Stream1_IRQHandler(void)
 {
-  /* USER CODE BEGIN FDCAN1_IT0_IRQn 0 */
+  /* USER CODE BEGIN DMA1_Stream1_IRQn 0 */
 
-  /* USER CODE END FDCAN1_IT0_IRQn 0 */
-  HAL_FDCAN_IRQHandler(&hfdcan1);
-  /* USER CODE BEGIN FDCAN1_IT0_IRQn 1 */
+  /* USER CODE END DMA1_Stream1_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_usart3_rx);
+  /* USER CODE BEGIN DMA1_Stream1_IRQn 1 */
 
-  /* USER CODE END FDCAN1_IT0_IRQn 1 */
-}
-
-/**
-  * @brief This function handles FDCAN1 interrupt 1.
-  */
-void FDCAN1_IT1_IRQHandler(void)
-{
-  /* USER CODE BEGIN FDCAN1_IT1_IRQn 0 */
-
-  /* USER CODE END FDCAN1_IT1_IRQn 0 */
-  HAL_FDCAN_IRQHandler(&hfdcan1);
-  /* USER CODE BEGIN FDCAN1_IT1_IRQn 1 */
-
-  /* USER CODE END FDCAN1_IT1_IRQn 1 */
-}
-
-/**
-  * @brief This function handles SPI1 global interrupt.
-  */
-void SPI1_IRQHandler(void)
-{
-  /* USER CODE BEGIN SPI1_IRQn 0 */
-
-  /* USER CODE END SPI1_IRQn 0 */
-  HAL_SPI_IRQHandler(&hspi1);
-  /* USER CODE BEGIN SPI1_IRQn 1 */
-
-  /* USER CODE END SPI1_IRQn 1 */
-}
-
-/**
-  * @brief This function handles UART4 global interrupt.
-  */
-void UART4_IRQHandler(void)
-{
-  /* USER CODE BEGIN UART4_IRQn 0 */
-
-  /* USER CODE END UART4_IRQn 0 */
-  HAL_UART_IRQHandler(&huart4);
-  /* USER CODE BEGIN UART4_IRQn 1 */
-
-  /* USER CODE END UART4_IRQn 1 */
+  /* USER CODE END DMA1_Stream1_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

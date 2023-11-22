@@ -7,7 +7,6 @@
 
 #include "stm32h7xx_hal.h"
 #include "VcuModel.h"
-#include "library.h"
 
 unsigned int Init_Analog(ADC_HandleTypeDef *hadc1);
 
