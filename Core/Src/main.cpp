@@ -118,7 +118,7 @@ int main(void)
   MX_FDCAN2_Init();
   MX_LPUART1_UART_Init();
   MX_UART7_Init();
-  MX_SDMMC1_SD_Init();
+  // MX_SDMMC1_SD_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
 
@@ -179,18 +179,18 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
   /* This will write to update CAN Inverter to 1 Mbit/s */
-  inverter_paramsIO(147, 1000, &hfdcan1, true);
+  inverter_paramsIO(147, 1000, true);
 
   /* This will write to update Torque Limit to whatever value (in this case 120 Nm) */
   uint16_t torque_limit = 120;
-  inverter_paramsIO(168, torque_limit * 10, &hfdcan1, true);
+  inverter_paramsIO(168, torque_limit * 10, true);
 
   /* This will clear any inverter faults */
   inverter_resetFaults();
 
   /* This will selectively disable any broadcasts from the inverter */
     uint32_t fault_enable_vector = 0xFFFF3CE5;
-    inverter_paramsIO(148, fault_enable_vector, &hfdcan1, true);
+    inverter_paramsIO(148, fault_enable_vector, true);
 
   vector<string> fault_strings(64);
   string inverter_state, vsm_state;
