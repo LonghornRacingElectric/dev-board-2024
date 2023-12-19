@@ -51,7 +51,7 @@ void MX_ADC1_Init(void)
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   hadc1.Init.ContinuousConvMode = ENABLE;
-  hadc1.Init.NbrOfConversion = 4;
+  hadc1.Init.NbrOfConversion = 5;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
@@ -112,6 +112,15 @@ void MX_ADC1_Init(void)
   {
     Error_Handler();
   }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_7;
+  sConfig.Rank = ADC_REGULAR_RANK_5;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
@@ -136,6 +145,7 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     /**ADC1 GPIO Configuration
     PC0     ------> ADC1_INP10
     PA6     ------> ADC1_INP3
+    PA7     ------> ADC1_INP7
     PC5     ------> ADC1_INP8
     PB1     ------> ADC1_INP5
     */
@@ -144,10 +154,10 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = ADC_BSE1_Pin;
+    GPIO_InitStruct.Pin = ADC_BSE1_Pin|ADC_STEER_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(ADC_BSE1_GPIO_Port, &GPIO_InitStruct);
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = ADC_APPS2_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
@@ -193,12 +203,13 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
     /**ADC1 GPIO Configuration
     PC0     ------> ADC1_INP10
     PA6     ------> ADC1_INP3
+    PA7     ------> ADC1_INP7
     PC5     ------> ADC1_INP8
     PB1     ------> ADC1_INP5
     */
     HAL_GPIO_DeInit(GPIOC, ADC_BSE2_Pin|ADC_APPS1_Pin);
 
-    HAL_GPIO_DeInit(ADC_BSE1_GPIO_Port, ADC_BSE1_Pin);
+    HAL_GPIO_DeInit(GPIOA, ADC_BSE1_Pin|ADC_STEER_Pin);
 
     HAL_GPIO_DeInit(ADC_APPS2_GPIO_Port, ADC_APPS2_Pin);
 

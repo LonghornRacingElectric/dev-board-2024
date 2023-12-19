@@ -34,7 +34,7 @@
 #include "analog.h"
 #include "inv.h"
 #include "faults.h"
-#include "can.h"
+#include "angel_can.h"
 #include <cmath>
 #include <vector>
 #include <string>
@@ -77,6 +77,27 @@ VcuModel vcuModel;
 VcuParameters vcuParameters;
 VcuInput vcuInput;
 VcuOutput vcuOutput;
+
+void ext_red_led(GPIO_PinState on) {
+    HAL_GPIO_WritePin(ext_red_led_GPIO_Port, ext_red_led_Pin, on);
+}
+void ext_yellow_led(GPIO_PinState on) {
+    HAL_GPIO_WritePin(ext_yellow_led_GPIO_Port, ext_yellow_led_Pin, on);
+}
+void ext_green_led(GPIO_PinState on) {
+    HAL_GPIO_WritePin(ext_green_led_GPIO_Port, ext_green_led_Pin, on);
+}
+void ext_blue_led(GPIO_PinState on) {
+    HAL_GPIO_WritePin(ext_blue_led_GPIO_Port, ext_blue_led_Pin, on);
+}
+void ext_white_led(GPIO_PinState on) {
+    HAL_GPIO_WritePin(ext_white_led_GPIO_Port, ext_white_led_Pin, on);
+}
+void ext_rgb_led(GPIO_PinState red, GPIO_PinState green, GPIO_PinState blue) {
+    HAL_GPIO_WritePin(ext_rgb_red_GPIO_Port, ext_rgb_red_Pin, red);
+    HAL_GPIO_WritePin(ext_rgb_green_GPIO_Port, ext_rgb_green_Pin, green);
+    HAL_GPIO_WritePin(ext_rgb_blue_GPIO_Port, ext_rgb_blue_Pin, blue);
+}
 /* USER CODE END 0 */
 
 /**
@@ -120,6 +141,7 @@ int main(void)
   MX_UART7_Init();
   // MX_SDMMC1_SD_Init();
   MX_SPI2_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
 //  volatile uint32_t last_time_recorded = 0;
@@ -163,12 +185,15 @@ int main(void)
 
   vcuModel.setParameters(&vcuParameters);
 
-  // left out steering initialization for now
+  // left out sus sensors for now
+  vcu_fault_vector = 0;
+    if(adc_start(&hadc1) != 0){
+        FAULT_SET(&vcu_fault_vector, FAULT_VCU_ADC);
+        HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
+        adc_stop(&hadc1);
+    }
+    AnalogVoltages adcVals;
 
-  if(Init_Analog(&hadc1) != 0){
-      vcu_fault_vector |= FAULT_VCU_ADC;
-      HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
-  }
   if(can_init(&hfdcan2) != HAL_OK){
       vcu_fault_vector |= FAULT_VCU_CAN;
       HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
@@ -192,8 +217,6 @@ int main(void)
     uint32_t fault_enable_vector = 0xFFFF3CE5;
     inverter_paramsIO(148, fault_enable_vector, true);
 
-  vector<string> fault_strings(64);
-  string inverter_state, vsm_state;
   InverterStatus status;
 
   /* USER CODE END 2 */
@@ -204,9 +227,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    Get_Analog(&vcuInput, &vcuParameters);
+    adc_get(&adcVals);
     vcuInput.driveSwitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_3);
     vcuInput.inverterReady = true;
+    vcuInput.apps1 = adcVals.apps1;
+    vcuInput.apps2 = adcVals.apps2;
+    vcuInput.bse1 = adcVals.bse1;
+    vcuInput.bse2 = adcVals.bse2;
+    vcuInput.steeringWheelPotVoltage = adcVals.steer;
 
     vcuModel.evaluate(&vcuInput, &vcuOutput, 0.003f);
 
@@ -214,34 +242,27 @@ int main(void)
     HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, (GPIO_PinState) !vcuOutput.prndlState);
     HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) (vcuOutput.faultApps || vcuOutput.faultBse || vcuOutput.faultStompp));
 
+    HAL_GPIO_WritePin(OUT_buzzer_GPIO_Port, OUT_buzzer_Pin, (GPIO_PinState) vcuOutput.r2dBuzzer);
+    if(vcuInput.bse1 > 0.5f || vcuInput.bse2 > 0.5f){
+        ext_white_led(GPIO_PIN_SET);
+    } else {
+        ext_white_led(GPIO_PIN_RESET);
+    }
     unsigned int CAN_error = inverter_sendTorqueCommand(vcuOutput.inverterTorqueRequest, 0, vcuInput.inverterReady);
     if(CAN_error > 0){
       vcu_fault_vector |= FAULT_VCU_INV;
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-    }
-    else{
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
     }
 
-    CAN_error = can_processRxFifo();
+    CAN_error += can_processRxFifo();
     if(CAN_error > 0){
       vcu_fault_vector |= FAULT_VCU_CAN;
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+        ext_red_led(GPIO_PIN_SET);
     }
     else{
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
-    }
-    float test_torque_command = inverter_getStatus(&status);
-
-    if(abs(test_torque_command - vcuOutput.inverterTorqueRequest) <= 0.1f){
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET);
-    }
-    else{
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+        ext_red_led(GPIO_PIN_RESET);
     }
 
     vcu_fault_vector = 0;
-    fault_strings.clear();
     can_clearMailboxes();
 
     HAL_Delay(3);
