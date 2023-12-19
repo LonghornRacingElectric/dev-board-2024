@@ -33,6 +33,7 @@
 #include "VcuModel.h"
 #include "analog.h"
 #include "inv.h"
+#include "pdu.h"
 #include "faults.h"
 #include "angel_can.h"
 #include <cmath>
@@ -199,6 +200,7 @@ int main(void)
       HAL_GPIO_WritePin(GPIOG, GPIO_PIN_6, GPIO_PIN_SET);
   }
   inverter_init();
+  pdu_init();
 
   HAL_GPIO_WritePin(CAN_TERM_GPIO_Port, CAN_TERM_Pin, GPIO_PIN_SET);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
@@ -217,7 +219,8 @@ int main(void)
     uint32_t fault_enable_vector = 0xFFFF3CE5;
     inverter_paramsIO(148, fault_enable_vector, true);
 
-  InverterStatus status;
+  InverterStatus invStatus;
+  PDUStatus pduStatus;
 
   /* USER CODE END 2 */
 
@@ -260,6 +263,20 @@ int main(void)
     }
     else{
         ext_red_led(GPIO_PIN_RESET);
+    }
+
+  uint32_t pdu_error = pdu_update(&pduStatus, &vcuOutput, 0.003f);
+    if(FAULT_CHECK(&vcu_fault_vector, FAULT_VCU_PDU)){
+        ext_red_led(GPIO_PIN_SET);
+    }
+    else{
+        ext_red_led(GPIO_PIN_RESET);
+    }
+    if(pdu_error == 2){
+        ext_rgb_led(GPIO_PIN_SET, GPIO_PIN_RESET, GPIO_PIN_RESET);
+    }
+    else{
+        ext_rgb_led(GPIO_PIN_RESET, GPIO_PIN_SET, GPIO_PIN_RESET);
     }
 
     vcu_fault_vector = 0;
