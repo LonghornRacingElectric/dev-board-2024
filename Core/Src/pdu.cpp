@@ -11,31 +11,31 @@ static uint32_t pdu_sendCoolingOutput(uint16_t radiatorFanRpm, float pumpPercent
 
 // Note that all the IDs PDU interacts with will be mentioned here
 void pdu_init(){
-    can_addMailbox(PDU_VCU_LVBAT, &lvbatt_status_mailbox);
-    can_addMailbox(PDU_VCU_THERMAL, &thermal_status_mailbox);
-    can_addTimer(VCU_PDU_BRAKELIGHT, 10);
-    can_addTimer(VCU_PDU_BUZZER, 10);
-    can_addTimer(VCU_PDU_COOLING, 250);
+    can_addRxBox(PDU_VCU_LVBAT, &lvbatt_status_mailbox);
+    can_addRxBox(PDU_VCU_THERMAL, &thermal_status_mailbox);
+    can_addTxBox(VCU_PDU_BRAKELIGHT, 10);
+    can_addTxBox(VCU_PDU_BUZZER, 10);
+    can_addTxBox(VCU_PDU_COOLING, 250);
 }
 
 static uint32_t pdu_sendBrakeLight(float brightnessLeft, float brightnessRight, uint32_t delta) {
     uint8_t data[8];
     data[0] = (uint8_t) (brightnessLeft * 255.0f);
     data[1] = (uint8_t) (brightnessRight * 255.0f);
-    return can_send_periodic(VCU_PDU_BRAKELIGHT, 2, data, delta);
+    return can_send(VCU_PDU_BRAKELIGHT, 2, data, delta);
 }
 
 static uint32_t pdu_sendBuzzer(BuzzerType buzzerType, uint32_t delta) {
     uint8_t data[1];
     data[0] = (uint8_t) buzzerType;
-    return can_send_periodic(VCU_PDU_BUZZER, 1, data, delta);
+    return can_send(VCU_PDU_BUZZER, 1, data, delta);
 }
 
 static uint32_t pdu_sendCoolingOutput(float radiatorFanRpm, float pumpPercentage, uint32_t delta) {
     uint8_t data[3];
     can_writeBytes(data, 0, 1, (uint16_t) radiatorFanRpm); // max will occur at 8300 rpm, but higher will just be ignored
     data[2] = (uint8_t) pumpPercentage;
-    return can_send_periodic(VCU_PDU_COOLING, 3, data, delta);
+    return can_send(VCU_PDU_COOLING, 3, data, delta);
 }
 
 uint32_t pdu_update(PDUStatus* status, VcuOutput* vcuOutput, float deltaTime){

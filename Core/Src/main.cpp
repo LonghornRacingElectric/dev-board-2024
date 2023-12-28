@@ -206,18 +206,16 @@ int main(void)
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
 
   /* This will write to update CAN Inverter to 1 Mbit/s */
-  inverter_paramsIO(147, 1000, true);
+    inverter_updateCANBitRate(1000);
 
   /* This will write to update Torque Limit to whatever value (in this case 120 Nm) */
-  uint16_t torque_limit = 120;
-  inverter_paramsIO(168, torque_limit * 10, true);
+    inverter_setTorqueLimit(120);
 
   /* This will clear any inverter faults */
   inverter_resetFaults();
 
   /* This will selectively disable any broadcasts from the inverter */
-    uint32_t fault_enable_vector = 0xFFFF3CE5;
-    inverter_paramsIO(148, fault_enable_vector, true);
+    inverter_enableFaults(0xFFFF3CE5);
 
   InverterStatus invStatus;
   PDUStatus pduStatus;
@@ -251,7 +249,7 @@ int main(void)
     } else {
         ext_white_led(GPIO_PIN_RESET);
     }
-    unsigned int CAN_error = inverter_sendTorqueCommand(vcuOutput.inverterTorqueRequest, 0, vcuInput.inverterReady);
+    unsigned int CAN_error = inverter_sendTorqueCommand(vcuOutput.inverterTorqueRequest, 0, vcuInput.inverterReady, 3);
     if(CAN_error > 0){
       vcu_fault_vector |= FAULT_VCU_INV;
     }
@@ -264,7 +262,13 @@ int main(void)
     else{
         ext_red_led(GPIO_PIN_RESET);
     }
-
+    inverter_update(&invStatus);
+    if(abs(invStatus.torqueCommand - vcuOutput.inverterTorqueRequest) < 0.1f){
+        ext_green_led(GPIO_PIN_SET);
+    }
+    else{
+        ext_green_led(GPIO_PIN_RESET);
+    }
   uint32_t pdu_error = pdu_update(&pduStatus, &vcuOutput, 0.003f);
     if(FAULT_CHECK(&vcu_fault_vector, FAULT_VCU_PDU)){
         ext_red_led(GPIO_PIN_SET);
