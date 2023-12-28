@@ -15,6 +15,7 @@ static CanRx inverterFaultMailbox;
 static CanRx torqueInfoMailbox;
 static CanRx highSpeedMailbox;
 static CanRx paramsResponseMailbox;
+static CanRx torqueRequestMailbox;
 
 
 
@@ -22,20 +23,25 @@ void inverter_init() {
     // TODO implement
 
     // example:
-    can_addMailbox(INV_VOLTAGE,  &voltageMailbox);
-    can_addMailbox(INV_CURRENT, &currentMailbox);
-    can_addMailbox(INV_TEMP3_DATA, &motorTempMailbox);
-    can_addMailbox(INV_TEMP1_DATA, &inverterTempMailbox);
-    can_addMailbox(INV_MOTOR_POSITIONS, &motorPosMailbox);
-    can_addMailbox(INV_STATE_CODES, &inverterStateMailbox);
-    can_addMailbox(INV_FAULT_CODES, &inverterFaultMailbox);
-    can_addMailbox(INV_TORQUE_TIMER, &torqueInfoMailbox);
-    // can_addMailbox(INV_HIGH_SPEED_MSG, &highSpeedMailbox);
-    can_addMailbox(INV_VCU_PARAMS_RESPONSE, &paramsResponseMailbox);
+    can_addRxBox(INV_VOLTAGE,  &voltageMailbox);
+    can_addRxBox(INV_CURRENT, &currentMailbox);
+    can_addRxBox(INV_TEMP3_DATA, &motorTempMailbox);
+    can_addRxBox(INV_TEMP1_DATA, &inverterTempMailbox);
+    can_addRxBox(INV_MOTOR_POSITIONS, &motorPosMailbox);
+    can_addRxBox(INV_STATE_CODES, &inverterStateMailbox);
+    can_addRxBox(INV_FAULT_CODES, &inverterFaultMailbox);
+    can_addRxBox(INV_TORQUE_TIMER, &torqueInfoMailbox);
+    // can_addRxBox(INV_HIGH_SPEED_MSG, &highSpeedMailbox);
+    can_addRxBox(INV_VCU_PARAMS_RESPONSE, &paramsResponseMailbox);
+
+    can_addRxBox(VCU_INV_COMMAND, &torqueRequestMailbox);
+
+    can_addTxBox(VCU_INV_COMMAND, 3);
+    can_addTxBox(VCU_INV_PARAMS_REQUEST, 1000);
 
 }
 
-void inverter_getStatus(InverterStatus* status) {
+void inverter_update(InverterStatus* status) {
 
     if(inverterTempMailbox.isRecent) {
         auto temp = can_readBytes(inverterTempMailbox.data, 0, 1) +
@@ -98,6 +104,12 @@ void inverter_getStatus(InverterStatus* status) {
         status->isRecent = true;
     }
 
+    if(torqueRequestMailbox.isRecent) {
+        status->torqueCommand = (float) can_readBytes(torqueRequestMailbox.data, 0, 1) / 10.0f;
+        torqueRequestMailbox.isRecent = false;
+        status->isRecent = true;
+    }
+
     if(paramsResponseMailbox.isRecent) {
         auto data = (uint16_t) can_readBytes(paramsResponseMailbox.data, 4, 5);
         if(paramsResponseMailbox.data[2] == 0){
@@ -108,7 +120,7 @@ void inverter_getStatus(InverterStatus* status) {
 
 }
 
-unsigned int inverter_sendTorqueCommand(float torque, float rpm, bool enable_inverter) {
+unsigned int inverter_sendTorqueCommand(float torque, float rpm, bool enable_inverter, uint32_t deltaTime) {
     static uint8_t torque_command[8];
     auto tc = (int16_t) (torque * 10.0f);
     auto sc = (int16_t) rpm;
@@ -116,12 +128,25 @@ unsigned int inverter_sendTorqueCommand(float torque, float rpm, bool enable_inv
     can_writeBytes(torque_command, 2, 3, sc);
     torque_command[5] = (uint8_t) enable_inverter; // Enable
 
-    return can_send(VCU_INV_COMMAND, 8, torque_command);
+    return can_send(VCU_INV_COMMAND, 8, torque_command, deltaTime);
 }
 
 unsigned int inverter_resetFaults() {
     // send a can message telling the inverter to reset faults by setting addr 20 to 0
     return inverter_paramsIO(20, 0, true);
+}
+unsigned int inverter_setTorqueLimit(uint32_t torqueLimit){
+    return inverter_paramsIO(168, torqueLimit * 10, true);
+}
+unsigned int inverter_enableFaults(uint32_t faultMask){
+    static uint8_t set_params[8];
+    can_writeBytes(set_params, 0, 1, 148); //param addr
+    can_writeBytes(set_params, 4, 7, faultMask);  //param value
+    set_params[2] = (uint8_t) true; //sets to write mode
+    return can_send(VCU_INV_PARAMS_REQUEST, 8, set_params, 1000);
+}
+unsigned int inverter_updateCANBitRate(uint32_t bitrate){
+    return inverter_paramsIO(147, bitrate, true);
 }
 
 unsigned int inverter_paramsIO(uint16_t param_addr, uint16_t param_value, bool write){
@@ -131,5 +156,5 @@ unsigned int inverter_paramsIO(uint16_t param_addr, uint16_t param_value, bool w
     can_writeBytes(set_params, 4, 5, param_value);  //param value
     set_params[2] = (uint8_t) write; //sets to write mode
 
-    return can_send(VCU_INV_PARAMS_REQUEST, 8, set_params);
+    return can_send(VCU_INV_PARAMS_REQUEST, 8, set_params, 1000);
 }
