@@ -62,6 +62,7 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 CanRx torqueCommandMailbox;
+uint8_t data[8];
 /* USER CODE END 0 */
 
 /**
@@ -101,8 +102,7 @@ int main(void)
 
   HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
   HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-  HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(SysTick_IRQn);
+  HAL_Delay(100);
 
   if(can_init(&hfdcan1) != HAL_OK) {
     Error_Handler();
@@ -120,10 +120,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    can_processRxFifo();
+
+    if(can_processRxFifo() != HAL_OK) {
+      Error_Handler();
+    }
     if(!torqueCommandMailbox.isRecent) {
       continue;
     }
+    torqueCommandMailbox.isRecent = false;
 
     led_red(true);
     led_yellow(false);
@@ -142,6 +146,10 @@ int main(void)
     led_green(1.0f);
 
     HAL_Delay(100);
+
+    led_red(false);
+    led_yellow(false);
+    led_green(0.0f);
   }
   /* USER CODE END 3 */
 }
@@ -224,9 +232,9 @@ void Error_Handler(void)
     while (1) {
       //Write to Red LED
         HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) false);
-        for(volatile int i = 0; i < 10000000; i++);
+        for(volatile int i = 0; i < 5000000; i++);
         HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) true);
-        for(volatile int i = 0; i < 10000000; i++);
+        for(volatile int i = 0; i < 5000000; i++);
     }
   /* USER CODE END Error_Handler_Debug */
 }
