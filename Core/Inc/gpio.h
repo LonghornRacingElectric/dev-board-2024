@@ -41,6 +41,8 @@ void MX_GPIO_Init(void);
 /* USER CODE BEGIN Prototypes */
 void led_yellow(bool on);
 void led_red(bool on);
+
+void can_term(bool on);
 /* USER CODE END Prototypes */
 
 #ifdef __cplusplus

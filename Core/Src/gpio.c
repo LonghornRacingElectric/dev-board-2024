@@ -130,4 +130,7 @@ void led_yellow(bool on) {
 void led_red(bool on) {
   HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) on);
 }
+void can_term(bool on) {
+  HAL_GPIO_WritePin(CAN_TERM_GPIO_Port, CAN_TERM_Pin, (GPIO_PinState) on);
+}
 /* USER CODE END 2 */

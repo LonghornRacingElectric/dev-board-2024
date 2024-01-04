@@ -103,17 +103,12 @@ int main(void)
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(SysTick_IRQn);
 
-
   // enable can termination
-  HAL_GPIO_WritePin(CAN_TERM_GPIO_Port, CAN_TERM_Pin, GPIO_PIN_SET);
-
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);
-
+  can_term(true);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  float x = 0.0f;
   while (1) {
     /* USER CODE END WHILE */
 
@@ -121,17 +116,21 @@ int main(void)
 
     led_red(true);
     led_yellow(false);
-    HAL_Delay(1000);
+    led_green(0.0f);
+
+    HAL_Delay(100);
 
     led_red(false);
     led_yellow(true);
-    HAL_Delay(200);
+    led_green(0.0f);
 
-    x += 0.25f;
-    if(x > 1.1f) {
-      x = 0;
-    }
-    led_green(x);
+    HAL_Delay(100);
+
+    led_red(false);
+    led_yellow(false);
+    led_green(1.0f);
+
+    HAL_Delay(100);
 
   }
   /* USER CODE END 3 */
