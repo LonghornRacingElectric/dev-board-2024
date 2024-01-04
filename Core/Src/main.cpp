@@ -27,6 +27,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "VcuModel.h"
+#include "angel_can.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,7 +61,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+CanRx torqueCommandMailbox;
 /* USER CODE END 0 */
 
 /**
@@ -103,8 +104,14 @@ int main(void)
   HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(SysTick_IRQn);
 
+  if(can_init(&hfdcan1) != HAL_OK) {
+    Error_Handler();
+  }
+
   // enable can termination
   can_term(true);
+  can_addMailbox(VCU_INV_COMMAND, &torqueCommandMailbox);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,6 +120,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    can_processRxFifo();
+    if(!torqueCommandMailbox.isRecent) {
+      continue;
+    }
 
     led_red(true);
     led_yellow(false);
@@ -131,7 +142,6 @@ int main(void)
     led_green(1.0f);
 
     HAL_Delay(100);
-
   }
   /* USER CODE END 3 */
 }
