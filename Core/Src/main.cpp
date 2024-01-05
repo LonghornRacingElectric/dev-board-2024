@@ -28,6 +28,7 @@
 /* USER CODE BEGIN Includes */
 #include "VcuModel.h"
 #include "angel_can.h"
+#include "clock.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -61,7 +62,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-CanRx torqueCommandMailbox;
+CanInbox torqueCommandMailbox;
 uint8_t data[8];
 /* USER CODE END 0 */
 
@@ -99,10 +100,7 @@ int main(void)
   MX_UART4_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
-  HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
-  HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-  HAL_Delay(100);
+  clock_init();
 
   if(can_init(&hfdcan1) != HAL_OK) {
     Error_Handler();
@@ -110,8 +108,9 @@ int main(void)
 
   // enable can termination
   can_term(true);
-  can_addMailbox(VCU_INV_COMMAND, &torqueCommandMailbox);
+  can_addInbox(VCU_INV_COMMAND, &torqueCommandMailbox);
 
+  float recency = 0.0f;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -120,36 +119,23 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    float deltaTime = clock_getDeltaTime();
 
-    if(can_processRxFifo() != HAL_OK) {
+    if(can_periodic(deltaTime) != HAL_OK) {
       Error_Handler();
     }
-    if(!torqueCommandMailbox.isRecent) {
-      continue;
+
+    if(torqueCommandMailbox.isRecent) {
+      torqueCommandMailbox.isRecent = false;
+      recency = 1.0f;
     }
-    torqueCommandMailbox.isRecent = false;
 
-    led_red(true);
-    led_yellow(false);
-    led_green(0.0f);
+    recency -= deltaTime * 3.0f;
+    if(recency < 0.0f) {
+      recency = 0.0f;
+    }
 
-    HAL_Delay(100);
-
-    led_red(false);
-    led_yellow(true);
-    led_green(0.0f);
-
-    HAL_Delay(100);
-
-    led_red(false);
-    led_yellow(false);
-    led_green(1.0f);
-
-    HAL_Delay(100);
-
-    led_red(false);
-    led_yellow(false);
-    led_green(0.0f);
+    led_green(recency);
   }
   /* USER CODE END 3 */
 }
