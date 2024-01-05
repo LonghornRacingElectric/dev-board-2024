@@ -130,12 +130,12 @@ int main(void)
       recency = 1.0f;
     }
 
+    led_green(recency);
+
     recency -= deltaTime * 3.0f;
     if(recency < 0.0f) {
       recency = 0.0f;
     }
-
-    led_green(recency);
   }
   /* USER CODE END 3 */
 }
