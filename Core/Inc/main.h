@@ -31,35 +31,16 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-#define NUM_STATES 14
-typedef enum {
-  VCU_INPUT,
-  VCU_CORE_REQ_TORQUE,
-  VCU_CORE_NO_REQ_TORQUE,
-  VCU_INPUT_FAULT_HANDLER,
-  VCU_CORE_FAULT_HANDLER,
-  BSPD_INPUT,
-  CAN_OUTPUT_BACKCAR,
-  CAN_OUTPUT_FAULT_HANDLER,
-  RTD_BUZZER,
-  CAN_OUTPUT_DASH,
-  CELL_OUTPUT,
-  SDCARD_OUTPUT,
-
-} State;
 
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-typedef struct {
-  State currentState;
-  State nextStates[NUM_STATES]; // Array of state functions
-} FSM;
 
 /* USER CODE END EC */
 
@@ -67,8 +48,6 @@ typedef struct {
 /* USER CODE BEGIN EM */
 
 /* USER CODE END EM */
-
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
@@ -89,16 +68,8 @@ void Error_Handler(void);
 #define USB_FS_PWR_EN_GPIO_Port GPIOF
 #define PH0_MCU_Pin GPIO_PIN_0
 #define PH0_MCU_GPIO_Port GPIOH
-#define PH1_MCU_Pin GPIO_PIN_1
-#define PH1_MCU_GPIO_Port GPIOH
-#define ADC_BSE2_Pin GPIO_PIN_0
-#define ADC_BSE2_GPIO_Port GPIOC
-#define ADC_BSE1_Pin GPIO_PIN_6
-#define ADC_BSE1_GPIO_Port GPIOA
-#define ADC_APPS1_Pin GPIO_PIN_5
-#define ADC_APPS1_GPIO_Port GPIOC
-#define ADC_APPS2_Pin GPIO_PIN_1
-#define ADC_APPS2_GPIO_Port GPIOB
+#define LD1_Pin GPIO_PIN_0
+#define LD1_GPIO_Port GPIOB
 #define CAN_TERM_Pin GPIO_PIN_11
 #define CAN_TERM_GPIO_Port GPIOF
 #define LD3_Pin GPIO_PIN_14
