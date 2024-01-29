@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "fdcan.h"
+#include "spi.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_otg.h"
@@ -26,9 +27,9 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "VcuModel.h"
-#include "angel_can.h"
-#include "clock.h"
+//#include "VcuModel.h"
+//#include "angel_can.h"
+//#include "clock.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,11 +51,11 @@
 
 /* USER CODE BEGIN PV */
 
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void PeriphCommonClock_Config(void);
 /* USER CODE BEGIN PFP */
 
 
@@ -62,8 +63,8 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-CanInbox torqueCommandMailbox;
-uint8_t data[8];
+//CanInbox torqueCommandMailbox;
+//uint8_t data[8];
 /* USER CODE END 0 */
 
 /**
@@ -88,6 +89,9 @@ int main(void)
   /* Configure the system clock */
   SystemClock_Config();
 
+/* Configure the peripherals common clocks */
+  PeriphCommonClock_Config();
+
   /* USER CODE BEGIN SysInit */
 
   /* USER CODE END SysInit */
@@ -99,18 +103,19 @@ int main(void)
   MX_USART3_UART_Init();
   MX_UART4_Init();
   MX_TIM3_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-  clock_init();
+//  clock_init();
 
-  if(can_init(&hfdcan1) != HAL_OK) {
-    Error_Handler();
-  }
+//  if(can_init(&hfdcan1) != HAL_OK) {
+//    Error_Handler();
+//  }
 
   // enable can termination
-  can_term(true);
-  can_addInbox(VCU_INV_COMMAND, &torqueCommandMailbox);
+//  can_term(true);
+//  can_addInbox(VCU_INV_COMMAND, &torqueCommandMailbox);
 
-  float recency = 0.0f;
+//  float recency = 0.0f;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -119,23 +124,32 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    float deltaTime = clock_getDeltaTime();
 
-    if(can_periodic(deltaTime) != HAL_OK) {
-      Error_Handler();
-    }
+    uint8_t data = 0xAA;
+    HAL_SPI_Transmit(&hspi1, &data, 1, 1000);
 
-    if(torqueCommandMailbox.isRecent) {
-      torqueCommandMailbox.isRecent = false;
-      recency = 1.0f;
-    }
+    led_green(1.0f);
+    HAL_Delay(200);
+    led_green(0.0f);
+    HAL_Delay(200);
 
-    led_green(recency);
-
-    recency -= deltaTime * 3.0f;
-    if(recency < 0.0f) {
-      recency = 0.0f;
-    }
+//    float deltaTime = clock_getDeltaTime();
+//
+//    if(can_periodic(deltaTime) != HAL_OK) {
+//      Error_Handler();
+//    }
+//
+//    if(torqueCommandMailbox.isRecent) {
+//      torqueCommandMailbox.isRecent = false;
+//      recency = 1.0f;
+//    }
+//
+//    led_green(recency);
+//
+//    recency -= deltaTime * 3.0f;
+//    if(recency < 0.0f) {
+//      recency = 0.0f;
+//    }
   }
   /* USER CODE END 3 */
 }
@@ -171,7 +185,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 25;
+  RCC_OscInitStruct.PLL.PLLN = 70;
   RCC_OscInitStruct.PLL.PLLP = 2;
   RCC_OscInitStruct.PLL.PLLQ = 2;
   RCC_OscInitStruct.PLL.PLLR = 2;
@@ -191,12 +205,39 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.SYSCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_HCLK_DIV1;
-  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV1;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV1;
-  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV1;
+  RCC_ClkInitStruct.APB3CLKDivider = RCC_APB3_DIV2;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_APB1_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_APB2_DIV2;
+  RCC_ClkInitStruct.APB4CLKDivider = RCC_APB4_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief Peripherals Common Clock Configuration
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
+
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI1|RCC_PERIPHCLK_FDCAN;
+  PeriphClkInitStruct.PLL2.PLL2M = 1;
+  PeriphClkInitStruct.PLL2.PLL2N = 16;
+  PeriphClkInitStruct.PLL2.PLL2P = 64;
+  PeriphClkInitStruct.PLL2.PLL2Q = 1;
+  PeriphClkInitStruct.PLL2.PLL2R = 2;
+  PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_3;
+  PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+  PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
+  PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL2;
+  PeriphClkInitStruct.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL2;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
@@ -213,15 +254,15 @@ void SystemClock_Config(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-    /* User can add his own implementation to report the HAL error return state */
-    __disable_irq();
-    while (1) {
-      //Write to Red LED
-        HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) false);
-        for(volatile int i = 0; i < 5000000; i++);
-        HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) true);
-        for(volatile int i = 0; i < 5000000; i++);
-    }
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1) {
+    //Write to Red LED
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) false);
+    for (volatile int i = 0; i < 5000000; i++);
+    HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState) true);
+    for (volatile int i = 0; i < 5000000; i++);
+  }
   /* USER CODE END Error_Handler_Debug */
 }
 
