@@ -17,6 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <cstring>
+#include <cstdio>
 #include "main.h"
 #include "fdcan.h"
 #include "spi.h"
@@ -27,10 +29,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-//#include "VcuModel.h"
-//#include "angel_can.h"
-//#include "clock.h"
-#include "adbms.h"
+#include "clock.h"
+#include "ltc6813.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -64,8 +64,9 @@ void PeriphCommonClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//CanInbox torqueCommandMailbox;
-//uint8_t data[8];
+float voltages[18];
+cell_asic ltcChip;
+uint8_t error;
 /* USER CODE END 0 */
 
 /**
@@ -106,42 +107,19 @@ int main(void)
   MX_TIM3_Init();
   MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
-//  clock_init();
+  clock_init();
 
-//  if(can_init(&hfdcan1) != HAL_OK) {
-//    Error_Handler();
-//  }
-
-  // enable can termination
-//  can_term(true);
-//  can_addInbox(VCU_INV_COMMAND, &torqueCommandMailbox);
-
-//  float recency = 0.0f;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  uint16_t voltage_buf[180] = { 0 };
-  adbms_init();
   while (1) {
-
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-    uint8_t data = 0xAA;
-//    HAL_SPI_Transmit(&hspi1, &data, 1, 1000);
-//    ltc6813_voltage_read(voltage_buf);
-
-
-//    adbms_init();
-//    ltc6813_voltage_read(voltage_buf);
     /* USER CODE BEGIN 3 */
-    volatile uint32_t error;
-    volatile uint16_t cmd;
 
-    uint8_t data_buf[180] = { 0 };
-
+    /*
 //    cmd = 0b01101100010; // ADCV - poll command so probably not ideal
 //    cmd = 0b00000010010; // RDSTATB - status register group B
 
@@ -150,44 +128,51 @@ int main(void)
     if(error) {
       Error_Handler();
     }
-    HAL_Delay(200); // super safe delay
+    HAL_Delay(2); // super safe delay
 
     cmd = 0b00000010000; // RDSTATA - status register group A
-    error = adbms_readCommand(cmd, data_buf);
+    error = adbms_readCommand(cmd, buffer);
     bool anything = false;
     for(int i = 0; i < 6; i++) {
-      if(data_buf[i] != 0xFF) {
+      if(buffer[i] != 0xFF) {
         anything = true;
         break;
       }
     }
     if((!error) && anything) {
-//      led_set(0, 0, 1);
       led_green(1.0f);
     } else {
-      led_red(1.0f);
-//      led_set(1, 0, 0);
+      led_red(true);
     }
-    HAL_Delay(1);
+    HAL_Delay(2);
+*/
 
+    ltcChip = {};
+    ltcChip.ic_reg.num_cv_reg = 6;
+    memset(voltages, 0, 18 * sizeof(float));
+
+    ltc6813_adcv(MD_7KHZ_3KHZ, DCP_ENABLED, CELL_CH_ALL);
+    error = ltc6813_rdcv(0, 1, &ltcChip);
+
+    volatile float totalVoltage = 0;
+    for(int i = 0; i < 18; i++) {
+      voltages[i] = static_cast<float>(ltcChip.cells.c_codes[i]) * 0.0001f;
+      totalVoltage += voltages[i];
+    }
+
+    if(error && !(totalVoltage > 50.0f && totalVoltage < 70.0f)) {
+      led_yellow(true);
+      led_green(0.0f);
+      led_red(true);
+    } else {
+      led_red(false);
+      led_yellow(false);
+      led_green(1.0f);
+    }
+
+    HAL_Delay(2);
 
 //    float deltaTime = clock_getDeltaTime();
-//
-//    if(can_periodic(deltaTime) != HAL_OK) {
-//      Error_Handler();
-//    }
-//
-//    if(torqueCommandMailbox.isRecent) {
-//      torqueCommandMailbox.isRecent = false;
-//      recency = 1.0f;
-//    }
-//
-//    led_green(recency);
-//
-//    recency -= deltaTime * 3.0f;
-//    if(recency < 0.0f) {
-//      recency = 0.0f;
-//    }
   }
   /* USER CODE END 3 */
 }
