@@ -30,6 +30,7 @@
 //#include "VcuModel.h"
 //#include "angel_can.h"
 //#include "clock.h"
+#include "adbms.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -120,18 +121,55 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  uint16_t voltage_buf[180] = { 0 };
+  adbms_init();
   while (1) {
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
     uint8_t data = 0xAA;
-    HAL_SPI_Transmit(&hspi1, &data, 1, 1000);
+//    HAL_SPI_Transmit(&hspi1, &data, 1, 1000);
+//    ltc6813_voltage_read(voltage_buf);
 
-    led_green(1.0f);
-    HAL_Delay(200);
-    led_green(0.0f);
-    HAL_Delay(200);
+
+//    adbms_init();
+//    ltc6813_voltage_read(voltage_buf);
+    /* USER CODE BEGIN 3 */
+    volatile uint32_t error;
+    volatile uint16_t cmd;
+
+    uint8_t data_buf[180] = { 0 };
+
+//    cmd = 0b01101100010; // ADCV - poll command so probably not ideal
+//    cmd = 0b00000010010; // RDSTATB - status register group B
+
+    cmd = 0b10011101000; // ADSTAT - do status register measurements (fast mode, all)
+    error = adbms_simpleCommand(cmd);
+    if(error) {
+      Error_Handler();
+    }
+    HAL_Delay(200); // super safe delay
+
+    cmd = 0b00000010000; // RDSTATA - status register group A
+    error = adbms_readCommand(cmd, data_buf);
+    bool anything = false;
+    for(int i = 0; i < 6; i++) {
+      if(data_buf[i] != 0xFF) {
+        anything = true;
+        break;
+      }
+    }
+    if((!error) && anything) {
+//      led_set(0, 0, 1);
+      led_green(1.0f);
+    } else {
+      led_red(1.0f);
+//      led_set(1, 0, 0);
+    }
+    HAL_Delay(1);
+
 
 //    float deltaTime = clock_getDeltaTime();
 //
