@@ -17,6 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#include <cstring>
+#include <string>
 #include "main.h"
 #include "fdcan.h"
 #include "tim.h"
@@ -26,8 +28,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "VcuModel.h"
-#include "angel_can.h"
 #include "clock.h"
 /* USER CODE END Includes */
 
@@ -62,8 +62,7 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-CanInbox torqueCommandMailbox;
-uint8_t data[8];
+uint8_t data[256];
 /* USER CODE END 0 */
 
 /**
@@ -102,15 +101,6 @@ int main(void)
   /* USER CODE BEGIN 2 */
   clock_init();
 
-  if(can_init(&hfdcan1) != HAL_OK) {
-    Error_Handler();
-  }
-
-  // enable can termination
-  can_term(true);
-  can_addInbox(VCU_INV_COMMAND, &torqueCommandMailbox);
-
-  float recency = 0.0f;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -121,21 +111,19 @@ int main(void)
     /* USER CODE BEGIN 3 */
     float deltaTime = clock_getDeltaTime();
 
-    if(can_periodic(deltaTime) != HAL_OK) {
-      Error_Handler();
+    uint16_t len;
+    HAL_UARTEx_ReceiveToIdle(&huart3, data, 256, &len, 1000);
+    for(int i = 0; i < (len - 1) / 2; i++) {
+      uint8_t temp = data[i];
+      data[i] = data[len - 2 - i];
+      data[len - 2 - i] = temp;
     }
+    HAL_UART_Transmit(&huart3, data, len, 1000);
 
-    if(torqueCommandMailbox.isRecent) {
-      torqueCommandMailbox.isRecent = false;
-      recency = 1.0f;
-    }
-
-    led_green(recency);
-
-    recency -= deltaTime * 3.0f;
-    if(recency < 0.0f) {
-      recency = 0.0f;
-    }
+    led_green(1.0f);
+    HAL_Delay(100);
+    led_green(0.0f);
+    HAL_Delay(100);
   }
   /* USER CODE END 3 */
 }
