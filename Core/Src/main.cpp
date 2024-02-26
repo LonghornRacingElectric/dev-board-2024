@@ -31,6 +31,7 @@
 /* USER CODE BEGIN Includes */
 #include "clock.h"
 #include "ltc6813.h"
+#include "adbms.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -151,8 +152,12 @@ int main(void)
     ltcChip.ic_reg.num_cv_reg = 6;
     memset(voltages, 0, 18 * sizeof(float));
 
-    ltc6813_adcv(MD_7KHZ_3KHZ, DCP_ENABLED, CELL_CH_ALL);
-    error = ltc6813_rdcv(0, 1, &ltcChip);
+    uint16_t data_buf[255] = { 0 };
+
+//    ltc6813_adcv(MD_7KHZ_3KHZ, DCP_ENABLED, CELL_CH_ALL);
+//    error = ltc6813_rdcv(0, 1, &ltcChip);
+
+      ltc6813_cmd_voltage_read(0, data_buf);
 
     volatile float totalVoltage = 0;
     for(int i = 0; i < 18; i++) {
